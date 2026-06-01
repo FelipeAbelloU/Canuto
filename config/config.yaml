@@ -1,0 +1,41 @@
+# =============================================================================
+# Asistente Normativo — Universidad de los Llanos
+# Configuración principal
+# =============================================================================
+
+# Perfil de hardware activo: "laptop" o "workstation"
+# El perfil sobrescribe las secciones relevantes de esta config.
+hardware_profile: laptop
+
+# --- Modelo fine-tuneado ---
+model:
+  # Ruta al checkpoint entrenado (formato HuggingFace: directorio con config.json, tokenizer, etc.)
+  # Dejar vacío hasta que el entrenamiento esté completo.
+  # Ejemplo: "models/checkpoint-500"  o ruta absoluta al directorio
+  checkpoint_path: "data/checkpoints/unillanos-v1"
+  device: cpu          # cpu | cuda
+  max_new_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+
+# --- Extracción de texto desde PDFs ---
+extraction:
+  pdf_dir: "PDF"               # directorio con los PDFs fuente
+  output_dir: "data/extracted" # dónde guardar los .txt extraídos
+  ocr_engine: "easyocr"        # easyocr | tesseract
+
+# --- Generación del dataset de fine-tuning ---
+dataset:
+  input_dir: "data/extracted"  # textos .txt de entrada
+  output_dir: "data/dataset"   # dataset JSON de salida
+  format: "alpaca"             # alpaca | sharegpt
+
+# --- Chat conversacional ---
+chat:
+  max_history: 5
+  system_prompt: |
+    Eres un asistente especializado en normativa universitaria de la Universidad de los Llanos (Unillanos), Colombia.
+    Responde preguntas sobre reglamentos, resoluciones, acuerdos y documentos normativos emitidos desde 2015.
+    Responde siempre en español, de manera clara y útil para estudiantes, docentes y personal administrativo.
+    Si no tienes certeza sobre una información, indícalo claramente.
+    No inventes información que no conozcas con certeza.

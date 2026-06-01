@@ -1,0 +1,42 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Checkpoints del modelo (3 GB — demasiado grandes para GitHub)
+data/checkpoints/
+
+# Textos extraídos (se regeneran con scripts/extract_text.py)
+data/extracted/
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Variables de entorno
+.env
+.env.local
+
+# Artefactos de descarga HuggingFace
+*.incomplete
+*.lock
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs y resultados de pruebas (se regeneran)
+*.log
+data/test_results.txt
+
+# Vector store (no se usa en este proyecto)
+data/vectorstore/
+
+# IDEs
+.idea/
+
+# Configuración local de Claude Code (rutas específicas de la máquina)
+.claude/

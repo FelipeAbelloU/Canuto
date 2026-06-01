@@ -1,0 +1,48 @@
+# =============================================================
+# Asistente Normativo Unillanos — Dependencias
+# =============================================================
+# Instalación:
+#
+# 1. Activar entorno virtual:
+#    venv\Scripts\activate
+#
+# 2. Instalar PyTorch según hardware:
+#    CPU (laptop):       pip install torch --index-url https://download.pytorch.org/whl/cpu
+#    CUDA (workstation): pip install torch --index-url https://download.pytorch.org/whl/cu121
+#
+# 3. Instalar el resto:
+#    pip install -r requirements.txt
+# =============================================================
+
+# --- Extracción de PDFs digitales ---
+pdfplumber>=0.11.0
+pypdf>=4.0.0
+
+# --- OCR para PDFs escaneados ---
+pymupdf>=1.24.0          # convierte páginas PDF a imágenes para OCR
+Pillow>=10.0.0           # manipulación de imágenes
+easyocr>=1.7.0           # OCR principal (español + inglés, no requiere instalación del sistema)
+# pytesseract>=0.3.10    # alternativa: requiere Tesseract instalado en el sistema
+
+# --- Configuración ---
+pyyaml>=6.0.1
+python-dotenv>=1.0.1
+
+# --- Modelo de lenguaje (HuggingFace) ---
+# torch se instala por separado (ver arriba)
+transformers>=4.45.0
+accelerate>=0.26.0
+huggingface_hub>=0.25.0
+
+# --- Fine-tuning con LoRA (solo necesario para scripts/train.py) ---
+peft>=0.13.0
+trl>=0.12.0,<0.13.0
+datasets>=2.20.0
+
+# --- Interfaz web ---
+gradio>=4.44.0
+
+# --- API REST (integración con SIRIUS) ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.0.0
