@@ -182,7 +182,7 @@ for f in sorted(archivos):
 
 # == DESPUES DE DESCARGAR ==
 # 1. Coloca los archivos en:
-#    Proyecto5\data\checkpoints\unillanos-v2\
+#    CANUTO\data\checkpoints\unillanos-v2\
 #
 # 2. Edita config/config.yaml:
 #    model:

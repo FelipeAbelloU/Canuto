@@ -1,0 +1,200 @@
+================================================================
+  CANUTO — Asistente Normativo Unillanos
+  Guia completa de uso y demostracion
+================================================================
+
+INDICE:
+  1. Correr el servidor (uso diario)
+  2. Cambiar version del modelo
+  3. Demostracion para la tutora
+  4. Problemas frecuentes y soluciones
+  5. Comandos utiles del proyecto
+  6. Script de descarga de Colab (uno por uno)
+
+================================================================
+1. CORRER EL SERVIDOR (USO DIARIO)
+================================================================
+
+Abre una terminal en VS Code (Ctrl + ñ) y ejecuta en orden:
+
+  cd C:\Users\Equipo\OneDrive\Documentos\Tesis\CANUTO
+  venv\Scripts\activate
+  python ui\django_chatbot\run.py
+
+Cuando aparezca "Ctrl+C para detener", el servidor esta listo.
+
+Abrir en el navegador:
+  - Pagina principal (widget flotante) : http://127.0.0.1:8000/
+  - Chat pantalla completa             : http://127.0.0.1:8000/chat/
+
+Para detener el servidor: Ctrl + C en la terminal.
+
+En una sola linea para recordar facilmente:
+  venv\Scripts\activate  →  python ui\django_chatbot\run.py  →  abrir 127.0.0.1:8000
+
+
+================================================================
+2. CAMBIAR VERSION DEL MODELO
+================================================================
+
+Editar el archivo config\config.yaml y cambiar la linea:
+  checkpoint_path: "data/checkpoints/unillanos-v1"
+
+Por la version que quieras usar:
+  checkpoint_path: "data/checkpoints/unillanos-v2"
+
+Guardar el archivo y reiniciar el servidor.
+
+Versiones disponibles en data/checkpoints/:
+  - unillanos-v1 : primer entrenamiento (20 PDFs, 228 pares QA)
+  - unillanos-v2 : segundo entrenamiento (34 PDFs, 384 pares QA, mejoras)
+
+
+================================================================
+3. DEMOSTRACION PARA LA TUTORA
+================================================================
+
+ANTES de llegar a la reunion:
+  a) Verificar que el checkpoint este en data/checkpoints/unillanos-v2/
+  b) Abrir config\config.yaml y confirmar checkpoint_path correcto
+  c) Probar el servidor en casa antes de ir
+
+DURANTE la reunion (paso a paso sin ayuda):
+
+  Paso 1 - Abrir VS Code en la carpeta CANUTO
+  Paso 2 - Abrir terminal: Ctrl + ñ
+  Paso 3 - Escribir:
+           venv\Scripts\activate
+           [Enter]
+           python ui\django_chatbot\run.py
+           [Enter]
+  Paso 4 - Esperar ~2 minutos (carga el modelo en RAM)
+           Listo cuando aparece "Ctrl+C para detener"
+  Paso 5 - Abrir Chrome y escribir: 127.0.0.1:8000
+  Paso 6 - Hacer clic en la garza (esquina inferior derecha)
+  Paso 7 - Hacer una pregunta de prueba
+
+PREGUNTAS DE PRUEBA RECOMENDADAS:
+  - "¿Cuales son los requisitos de segunda lengua para graduarse?"
+  - "¿Como funciona el fraccionamiento de matricula?"
+  - "¿Que establece el reglamento estudiantil de pregrado?"
+  - "¿Que debo hacer si tengo una incapacidad medica?"
+  - "¿Cuanto cuesta la matricula en Unillanos?"
+
+COSAS QUE PUEDES MOSTRAR:
+  1. Chat pantalla completa (127.0.0.1:8000/chat/)
+  2. Widget flotante (127.0.0.1:8000/)
+  3. Modo oscuro/claro (boton de la luna en la cabecera)
+  4. Nueva conversacion (boton rojo en el sidebar)
+  5. Estructura del proyecto en VS Code (carpetas src/, scripts/, ui/)
+
+
+================================================================
+4. PROBLEMAS FRECUENTES Y SOLUCIONES
+================================================================
+
+PROBLEMA: ModuleNotFoundError: No module named 'django'
+SOLUCION: Olvidaste activar el venv.
+          Ejecuta primero: venv\Scripts\activate
+
+PROBLEMA: "El modelo aun no esta disponible"
+SOLUCION: Falta configurar el checkpoint.
+          Edita config\config.yaml y pon la ruta correcta en checkpoint_path.
+
+PROBLEMA: La pagina no carga en el navegador
+SOLUCION: El servidor no esta corriendo. Revisa la terminal.
+          Si hay error, copialo y consulta a Claude.
+
+PROBLEMA: Puerto 8000 ocupado
+SOLUCION: Usa otro puerto:
+          python ui\django_chatbot\run.py --port 8080
+          Luego abre: 127.0.0.1:8080
+
+PROBLEMA: El modelo tarda mucho en cargar (primera vez)
+SOLUCION: Normal. El modelo pesa ~3 GB y tarda 1-3 minutos en cargar a RAM.
+          Las siguientes preguntas responden mas rapido.
+
+
+================================================================
+5. COMANDOS UTILES DEL PROYECTO
+================================================================
+
+EXTRACCION DE TEXTO DE PDFS:
+  python scripts\extract_text.py
+
+GENERAR DATASET DE ENTRENAMIENTO:
+  python scripts\build_dataset.py --mode heuristic
+
+AGREGAR CONOCIMIENTO CURADO AL DATASET:
+  python scripts\add_knowledge.py
+
+CHAT POR TERMINAL (sin interfaz web):
+  python scripts\chat_cli.py
+
+PRUEBAS DEL MODELO (8 preguntas automaticas):
+  python scripts\test_model.py
+  (resultados en data\test_results.txt)
+
+API REST PARA SIRIUS:
+  uvicorn src.api.app:app --reload --port 8000
+  (documentacion en http://127.0.0.1:8000/docs)
+
+
+================================================================
+6. SCRIPT DESCARGA CHECKPOINT DESDE COLAB (UNO POR UNO)
+================================================================
+
+Cuando el entrenamiento en Colab termina, pega esto en una celda nueva:
+
+--------------------------------------------------------------
+from google.colab import files
+from pathlib import Path
+
+OUTPUT_DIR = "/content/unillanos-v2"
+
+archivos = sorted([
+    f for f in Path(OUTPUT_DIR).iterdir()
+    if f.is_file() and not f.name.startswith("_")
+])
+
+print(f"{len(archivos)} archivos para descargar.")
+print("El navegador abrira un dialogo por cada archivo.")
+print("Acepta cada descarga ANTES de presionar Enter.\n")
+
+for i, f in enumerate(archivos, 1):
+    size_mb = f.stat().st_size / 1e6
+    print(f"[{i}/{len(archivos)}] Descargando: {f.name}  ({size_mb:.0f} MB)")
+    files.download(str(f))
+    if size_mb > 50:
+        input("    Espera a que la barra de descarga llegue al 100% y presiona Enter...")
+    else:
+        print("    (archivo pequeno, continua automaticamente)")
+
+print("\nTodos los archivos descargados.")
+print("Colocalos en: CANUTO\\data\\checkpoints\\unillanos-v2\\")
+--------------------------------------------------------------
+
+Despues de descargar, mueve todos los archivos a:
+  C:\Users\Equipo\OneDrive\Documentos\Tesis\CANUTO\data\checkpoints\unillanos-v2\
+
+Y actualiza config\config.yaml:
+  checkpoint_path: "data/checkpoints/unillanos-v2"
+
+
+================================================================
+  ESTRUCTURA DE ARCHIVOS IMPORTANTES
+================================================================
+
+CANUTO/
+  config/config.yaml         <- configuracion principal (checkpoint_path aqui)
+  data/checkpoints/          <- modelos entrenados
+  data/dataset/              <- dataset de entrenamiento (384 pares QA)
+  PDF/                       <- documentos PDF fuente (34 PDFs)
+  scripts/                   <- scripts de extraccion y entrenamiento
+  src/                       <- modulos del sistema (no modificar)
+  ui/django_chatbot/         <- interfaz web CANUTO
+  notas y ayudas/            <- esta carpeta (guias y scripts)
+
+================================================================
+  FIN DEL DOCUMENTO
+================================================================

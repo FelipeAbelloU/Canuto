@@ -3,7 +3,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Agrega la raiz de Proyecto5 al path para importar src.*
+# Agrega la raiz de CANUTO al path para importar src.*
 PROYECTO5_ROOT = BASE_DIR.parent.parent
 if str(PROYECTO5_ROOT) not in sys.path:
     sys.path.insert(0, str(PROYECTO5_ROOT))

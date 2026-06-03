@@ -10,13 +10,13 @@ import sys
 import argparse
 from pathlib import Path
 
-# Agrega Proyecto5 al path
+# Agrega CANUTO al path para que Django encuentre src.*
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "chatbot.settings")
 
-# Cambia al directorio del proyecto Django para que manage.py encuentre los módulos
+# Cambia al directorio del proyecto Django
 os.chdir(Path(__file__).parent)
 
 
@@ -34,8 +34,14 @@ def main():
     print("  Ctrl+C para detener")
     print()
 
-    from django.core.management import call_command
-    call_command("runserver", f"{args.host}:{args.port}", "--noreload")
+    # execute_from_command_line inicializa Django correctamente (igual que manage.py)
+    from django.core.management import execute_from_command_line
+    execute_from_command_line([
+        "manage.py",
+        "runserver",
+        f"{args.host}:{args.port}",
+        "--noreload",
+    ])
 
 
 if __name__ == "__main__":
