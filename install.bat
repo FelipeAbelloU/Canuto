@@ -1,6 +1,6 @@
 @echo off
 REM =============================================================
-REM  Asistente Normativo Unillanos — Instalacion del entorno
+REM  Asistente Normativo Unillanos -- Instalacion del entorno
 REM  Ejecutar UNA SOLA VEZ desde la carpeta Proyecto5\
 REM =============================================================
 
@@ -18,7 +18,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/5] Creando entorno virtual...
+echo [1/4] Creando entorno virtual...
 python -m venv venv
 if errorlevel 1 (
     echo [ERROR] No se pudo crear el entorno virtual.
@@ -26,29 +26,37 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [2/5] Activando entorno virtual...
+echo [2/4] Activando entorno virtual...
 call venv\Scripts\activate.bat
 
-echo [3/5] Instalando PyTorch (solo CPU, optimizado para laptop)...
-pip install torch --index-url https://download.pytorch.org/whl/cpu --quiet
+echo [3/4] Instalando PyTorch...
+echo.
+echo  Elige el tipo de instalacion:
+echo    1. Solo CPU (laptop i5-7200U)
+echo    2. CUDA 12.1 (workstation RTX 4090i)
+echo.
+set /p opcion="Opcion (1 o 2): "
+
+if "%opcion%"=="2" (
+    echo Instalando PyTorch con soporte CUDA 12.1...
+    pip install torch --index-url https://download.pytorch.org/whl/cu121 --quiet
+) else (
+    echo Instalando PyTorch solo CPU...
+    pip install torch --index-url https://download.pytorch.org/whl/cpu --quiet
+)
+
 if errorlevel 1 (
     echo [ERROR] Fallo al instalar PyTorch.
     pause
     exit /b 1
 )
 
-echo [4/5] Instalando dependencias del proyecto...
+echo [4/4] Instalando dependencias del proyecto...
 pip install -r requirements.txt --quiet
 if errorlevel 1 (
     echo [ERROR] Fallo al instalar dependencias.
     pause
     exit /b 1
-)
-
-echo [5/5] Copiando archivo de variables de entorno...
-if not exist .env (
-    copy .env.example .env >nul
-    echo    Archivo .env creado. Edita las claves API si las necesitas.
 )
 
 echo.
@@ -58,18 +66,22 @@ echo ============================================================
 echo.
 echo Pasos siguientes:
 echo.
-echo  1. Indexar los documentos normativos (PDFs de Tesis\PDF\):
-echo     venv\Scripts\python scripts\ingest.py --docs-dir ..\PDF
+echo  1. Extraer texto de los PDFs normativos:
+echo     venv\Scripts\python scripts\extract_text.py
 echo.
-echo  2. Probar el chat en la terminal:
+echo  2. Generar dataset de fine-tuning:
+echo     venv\Scripts\python scripts\build_dataset.py --mode heuristic
+echo.
+echo  3. Probar el chat por terminal (requiere checkpoint entrenado):
 echo     venv\Scripts\python scripts\chat_cli.py
 echo.
-echo  3. Abrir la interfaz web (Gradio):
+echo  4. Abrir la interfaz web:
 echo     venv\Scripts\python ui\app.py
 echo.
-echo  4. (Opcional) Para respuestas generadas, instala Ollama:
-echo     https://ollama.com
-echo     Luego: ollama pull qwen2.5:1.5b
-echo     Y cambia en config\config.yaml:  backend: ollama
+echo  5. Iniciar la API REST para SIRIUS:
+echo     venv\Scripts\uvicorn src.api.app:app --reload --port 8000
+echo.
+echo  NOTA: El modelo fine-tuneado debe configurarse en config\config.yaml
+echo        bajo model.checkpoint_path antes de usar el chat.
 echo.
 pause

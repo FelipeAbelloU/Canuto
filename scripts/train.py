@@ -2,12 +2,12 @@
 scripts/train.py — Fine-tuning de Qwen2.5-1.5B-Instruct sobre normativa Unillanos
 
 TIEMPO ESTIMADO EN ESTA MÁQUINA (i5-7200U, CPU):
-  Entrenamiento completo (3 épocas, 228 ejemplos): ~15-30 horas
-  Alternativa gratuita más rápida: Google Colab T4  →  ~15-20 minutos
-    Colab: https://colab.research.google.com  →  Entorno de ejecución → T4 GPU
+  Entrenamiento completo (3 épocas): ~15-30 horas segun tamanio del dataset
+  Alternativa recomendada: Google Colab T4  →  ~20-30 minutos (gratis)
+    Ver scripts/colab_train.py para la guia paso a paso
 
 ANTES DE EJECUTAR EL ENTRENAMIENTO COMPLETO:
-  1. pip install peft>=0.13 "trl>=0.12,<0.13" datasets
+  1. pip install "peft>=0.13,<0.14" "trl>=0.12,<0.13" datasets
   2. Pausar OneDrive — el checkpoint final pesa ~3 GB y está dentro de la carpeta
   3. Cerrar Chrome, VSCode preview, apps pesadas — necesitas ~10 GB de RAM libre
 

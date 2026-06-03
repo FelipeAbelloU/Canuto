@@ -1,5 +1,5 @@
-"""Pipeline conversacional para el asistente normativo.
-Genera respuestas directamente desde el modelo fine-tuneado (sin RAG).
+"""Pipeline conversacional del asistente normativo.
+Recibe preguntas del usuario y devuelve respuestas del modelo fine-tuneado.
 """
 from __future__ import annotations
 
@@ -15,9 +15,7 @@ _DEFAULT_SYSTEM = (
 
 _NO_MODEL_MSG = (
     "El modelo aún no está disponible.\n\n"
-    "El fine-tuning del modelo está pendiente. "
-    "Una vez entrenado, configura la ruta del checkpoint en "
-    "`config/config.yaml` bajo `model.checkpoint_path`."
+    "Configura la ruta del checkpoint en `config/config.yaml` bajo `model.checkpoint_path`."
 )
 
 
@@ -31,6 +29,7 @@ class ChatPipeline:
         self.model = model
         self.system_prompt = system_prompt or _DEFAULT_SYSTEM
         self.history = ConversationHistory(max_turns=max_history)
+        self._max_history = max_history
 
     def query(self, question: str) -> dict:
         """Procesa una pregunta y retorna la respuesta del modelo."""
@@ -40,8 +39,9 @@ class ChatPipeline:
                 "model_used": "sin modelo",
             }
 
+        # Construir lista de mensajes: system + historial reciente + pregunta actual
         messages = [{"role": "system", "content": self.system_prompt}]
-        for turn in self.history.turns[-3:]:
+        for turn in self.history.turns[-self._max_history:]:
             messages.append({"role": "user", "content": turn["user"]})
             messages.append({"role": "assistant", "content": turn["assistant"]})
         messages.append({"role": "user", "content": question})
