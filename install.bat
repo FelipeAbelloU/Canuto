@@ -1,7 +1,7 @@
 @echo off
 REM =============================================================
 REM  Asistente Normativo Unillanos -- Instalacion del entorno
-REM  Ejecutar UNA SOLA VEZ desde la carpeta Proyecto5\
+REM  Ejecutar UNA SOLA VEZ desde la carpeta CANUTO\
 REM =============================================================
 
 echo.

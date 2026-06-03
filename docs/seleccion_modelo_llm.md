@@ -186,4 +186,4 @@ Zhang, T., et al. (2025). BenchMAX: A comprehensive multilingual evaluation suit
 
 ---
 
-*Documento generado como soporte técnico para la selección del modelo base del Proyecto5 — Asistente Normativo Unillanos.*
+*Documento generado como soporte técnico para la selección del modelo base del CANUTO — Asistente Normativo Unillanos.*

@@ -207,6 +207,41 @@ NUEVOS_PARES = [
             "Admisiones de Unillanos o revisar la convocatoria oficial de admisiones."
         ),
     },
+    # ── Variantes específicas de precio de matrícula (fuera de dominio) ──
+    {
+        "instruction": "¿Cuánto cuesta la matrícula en Unillanos para el semestre 2026-2?",
+        "input": "",
+        "output": (
+            "El valor de la matrícula en Unillanos no tiene un precio fijo para ningún semestre. "
+            "Se calcula de forma personalizada para cada estudiante según: nivel de SISBEN, "
+            "ingresos económicos propios o del acudiente, puntaje ICFES y estrato socioeconómico.\n\n"
+            "No tengo información sobre valores específicos de matrícula en los documentos que conozco. "
+            "Para conocer el valor exacto que te corresponde para 2026-2, consulta con la "
+            "Oficina de Admisiones, Registro y Control Académico de Unillanos."
+        ),
+    },
+    {
+        "instruction": "¿Cuánto cuesta la matrícula en Unillanos para el semestre 2025-1?",
+        "input": "",
+        "output": (
+            "El valor de la matrícula en Unillanos varía para cada estudiante según su situación "
+            "socioeconómica. No existe un valor único por semestre.\n\n"
+            "No tengo información sobre valores específicos de matrícula en los documentos que conozco. "
+            "Consulta con la Oficina de Admisiones y Registro de Unillanos para conocer "
+            "el valor que te corresponde."
+        ),
+    },
+    {
+        "instruction": "¿Cuál es el valor de la matrícula para ingeniería en Unillanos?",
+        "input": "",
+        "output": (
+            "El valor de la matrícula en Unillanos no depende del programa académico sino de "
+            "la situación socioeconómica del estudiante: nivel de SISBEN, ingresos económicos, "
+            "puntaje ICFES y estrato.\n\n"
+            "No tengo información sobre valores específicos en los documentos que conozco. "
+            "Consulta directamente con la Oficina de Admisiones y Registro de Unillanos."
+        ),
+    },
     {
         "instruction": "¿Unillanos tiene convenios con otras universidades?",
         "input": "",

@@ -1918,5 +1918,20 @@
     "instruction": "¿Unillanos tiene convenios con otras universidades?",
     "input": "",
     "output": "No tengo información detallada sobre convenios interinstitucionales en los documentos que conozco. Para esa información, consulta con la Oficina de Relaciones Interinstitucionales de Unillanos."
+  },
+  {
+    "instruction": "¿Cuánto cuesta la matrícula en Unillanos para el semestre 2026-2?",
+    "input": "",
+    "output": "El valor de la matrícula en Unillanos no tiene un precio fijo para ningún semestre. Se calcula de forma personalizada para cada estudiante según: nivel de SISBEN, ingresos económicos propios o del acudiente, puntaje ICFES y estrato socioeconómico.\n\nNo tengo información sobre valores específicos de matrícula en los documentos que conozco. Para conocer el valor exacto que te corresponde para 2026-2, consulta con la Oficina de Admisiones, Registro y Control Académico de Unillanos."
+  },
+  {
+    "instruction": "¿Cuánto cuesta la matrícula en Unillanos para el semestre 2025-1?",
+    "input": "",
+    "output": "El valor de la matrícula en Unillanos varía para cada estudiante según su situación socioeconómica. No existe un valor único por semestre.\n\nNo tengo información sobre valores específicos de matrícula en los documentos que conozco. Consulta con la Oficina de Admisiones y Registro de Unillanos para conocer el valor que te corresponde."
+  },
+  {
+    "instruction": "¿Cuál es el valor de la matrícula para ingeniería en Unillanos?",
+    "input": "",
+    "output": "El valor de la matrícula en Unillanos no depende del programa académico sino de la situación socioeconómica del estudiante: nivel de SISBEN, ingresos económicos, puntaje ICFES y estrato.\n\nNo tengo información sobre valores específicos en los documentos que conozco. Consulta directamente con la Oficina de Admisiones y Registro de Unillanos."
   }
 ]
