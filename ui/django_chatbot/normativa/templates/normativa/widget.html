@@ -1,0 +1,167 @@
+{% load static %}
+<!-- =====================================================
+     Widget flotante CANUTO
+     Se incluye en cualquier página con: {% include "normativa/widget.html" %}
+     ===================================================== -->
+
+<!-- Botón flotante con la garza -->
+<button id="widget-btn"
+  onclick="widgetToggle()"
+  class="fixed bottom-6 right-6 w-16 h-16 bg-white rounded-full shadow-lg border-2 border-red-600
+         flex items-center justify-center z-50 hover:shadow-xl transition-all hover:scale-110 p-2"
+  title="Abrir asistente CANUTO">
+  <img src="{% static 'normativa/garza.png' %}" alt="CANUTO" class="w-full h-full rounded-full">
+</button>
+
+<!-- Ventana del widget -->
+<div id="widget-window"
+  class="fixed bottom-24 right-6 w-96 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden
+         widget-transition bg-white dark:bg-neutral-950 hidden"
+  style="height: 520px;">
+
+  <!-- Cabecera roja -->
+  <div class="bg-red-600 text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <img src="{% static 'normativa/garza.png' %}" alt="CANUTO" class="w-9 h-9 rounded-full bg-white p-0.5">
+      <div>
+        <p class="font-semibold text-sm leading-tight">CANUTO</p>
+        <p class="text-xs text-red-100">Asistente Normativo Unillanos</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-1">
+      <!-- Toggle modo oscuro -->
+      <button onclick="toggleTheme()" class="w-8 h-8 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors" title="Cambiar tema">
+        <svg class="w-4 h-4 theme-icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+        <svg class="w-4 h-4 theme-icon-sun hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+        </svg>
+      </button>
+      <!-- Minimizar -->
+      <button onclick="widgetMinimize()" class="w-8 h-8 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors" title="Minimizar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+        </svg>
+      </button>
+      <!-- Cerrar -->
+      <button onclick="widgetToggle()" class="w-8 h-8 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors" title="Cerrar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Área de mensajes -->
+  <div id="widget-messages"
+    class="flex-1 overflow-y-auto p-4 space-y-3 chat-scroll bg-gray-50 dark:bg-neutral-900">
+    <!-- Bienvenida inicial -->
+    <div class="flex justify-center py-6">
+      <div class="text-center">
+        <img src="{% static 'normativa/garza.png' %}" alt="CANUTO" class="w-12 h-12 rounded-full mx-auto mb-2 bg-white p-1 border border-gray-200">
+        <p class="text-sm text-gray-500 dark:text-gray-400">¡Hola! ¿En qué puedo ayudarte hoy?</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex-shrink-0">
+    <div class="flex gap-2">
+      <input id="widget-input"
+        type="text"
+        placeholder="Escribe tu pregunta..."
+        class="flex-1 text-sm border border-gray-300 dark:border-neutral-700 rounded-lg px-3 py-2
+               bg-white dark:bg-neutral-800 text-gray-900 dark:text-white
+               placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+        onkeydown="if(event.key==='Enter') widgetSend()">
+      <button onclick="widgetSend()"
+        class="bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 py-2 transition-colors flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let widgetOpen = false;
+  let widgetMinimized = false;
+
+  function widgetToggle() {
+    widgetOpen = !widgetOpen;
+    const win = document.getElementById('widget-window');
+    const btn = document.getElementById('widget-btn');
+    win.classList.toggle('hidden', !widgetOpen);
+    btn.classList.toggle('hidden', widgetOpen);
+    widgetMinimized = false;
+  }
+
+  function widgetMinimize() {
+    widgetMinimized = !widgetMinimized;
+    const msgs = document.getElementById('widget-messages');
+    const inp  = document.getElementById('widget-window').querySelector('.px-4.py-3.border-t');
+    msgs.classList.toggle('hidden', widgetMinimized);
+    inp.classList.toggle('hidden', widgetMinimized);
+  }
+
+  function widgetAddMessage(role, text) {
+    const area = document.getElementById('widget-messages');
+    const div = document.createElement('div');
+    div.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+
+    const bubble = document.createElement('div');
+    bubble.className = role === 'user'
+      ? 'max-w-[80%] bg-red-600 text-white rounded-2xl px-3 py-2 text-sm'
+      : 'max-w-[80%] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-900 dark:text-white rounded-2xl px-3 py-2 text-sm';
+    bubble.style.whiteSpace = 'pre-wrap';
+    bubble.textContent = text;
+    div.appendChild(bubble);
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+    return div;
+  }
+
+  function widgetAddTyping() {
+    const area = document.getElementById('widget-messages');
+    const div = document.createElement('div');
+    div.className = 'flex justify-start';
+    div.id = 'widget-typing';
+    div.innerHTML = `
+      <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-2xl px-3 py-2">
+        <div class="flex gap-1">
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+        </div>
+      </div>`;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  async function widgetSend() {
+    const input = document.getElementById('widget-input');
+    const question = input.value.trim();
+    if (!question) return;
+
+    input.value = '';
+    widgetAddMessage('user', question);
+    widgetAddTyping();
+
+    try {
+      const res = await fetch('/api/query/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      document.getElementById('widget-typing')?.remove();
+      widgetAddMessage('assistant', data.answer || data.error || 'Error al obtener respuesta.');
+    } catch (e) {
+      document.getElementById('widget-typing')?.remove();
+      widgetAddMessage('assistant', 'Error de conexión. Verifica que el servidor esté activo.');
+    }
+  }
+</script>

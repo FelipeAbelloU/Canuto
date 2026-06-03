@@ -39,7 +39,10 @@ peft>=0.13.0
 trl>=0.12.0,<0.13.0
 datasets>=2.20.0
 
-# --- Interfaz web ---
+# --- Interfaz web Django (CANUTO) ---
+django>=4.2.0
+
+# --- Interfaz web alternativa (Gradio, opcional) ---
 gradio>=4.44.0
 
 # --- API REST (integración con SIRIUS) ---
