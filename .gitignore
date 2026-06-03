@@ -40,3 +40,9 @@ data/vectorstore/
 
 # Configuración local de Claude Code (rutas específicas de la máquina)
 .claude/
+
+# Mockup React (referencia de diseño — código fuente de Figma Make, no es parte del proyecto)
+mockup_chatbot/
+
+# Archivos de error Django subidos por accidente
+RecursionError*.pdf
