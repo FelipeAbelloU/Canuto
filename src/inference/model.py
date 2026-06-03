@@ -34,12 +34,14 @@ class FineTunedModel:
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.checkpoint_path, trust_remote_code=True
         )
+        # BF16 en GPU (mismo dtype usado en el entrenamiento), FP32 en CPU
+        dtype = torch.bfloat16 if self.device != "cpu" else torch.float32
         self._model = AutoModelForCausalLM.from_pretrained(
             self.checkpoint_path,
-            torch_dtype=torch.float16 if self.device != "cpu" else torch.float32,
+            torch_dtype=dtype,
             device_map=self.device if self.device != "cpu" else None,
             trust_remote_code=True,
-            low_cpu_mem_usage=True,  # reduce pico de RAM durante carga (~50% menos)
+            low_cpu_mem_usage=True,
         )
         if self.device == "cpu":
             self._model = self._model.to("cpu")
