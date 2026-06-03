@@ -1,0 +1,101 @@
+{% extends "normativa/base.html" %}
+{% load static %}
+
+{% block title %}CANUTO — Asistente Normativo Unillanos{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 dark:from-neutral-950 dark:to-neutral-900">
+
+  <!-- Contenido de página de demostración -->
+  <div class="max-w-5xl mx-auto px-6 py-12">
+
+    <!-- Encabezado -->
+    <header class="text-center mb-12">
+      <div class="flex items-center justify-center gap-4 mb-4">
+        <img src="{% static 'normativa/garza.png' %}" alt="Logo Unillanos" class="w-14 h-14 rounded-full border-2 border-red-600 p-1 bg-white">
+        <div class="text-left">
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white leading-tight">CANUTO</h1>
+          <p class="text-red-600 text-sm font-medium">Asistente Normativo — Universidad de los Llanos</p>
+        </div>
+      </div>
+      <p class="text-gray-500 dark:text-gray-400 text-sm">
+        Haz clic en el botón de la garza en la esquina inferior derecha para consultar normativa universitaria.
+      </p>
+    </header>
+
+    <!-- Tarjetas informativas -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-neutral-800">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <span class="w-2 h-2 bg-red-600 rounded-full inline-block"></span>
+          Información Académica
+        </h3>
+        <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+          Consulta reglamentos, resoluciones y acuerdos académicos de Unillanos.
+        </p>
+        <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+          <li>• Reglamento estudiantil de pregrado y posgrado</li>
+          <li>• Calendarios académicos</li>
+          <li>• Opciones de grado</li>
+          <li>• Requisitos de segunda lengua</li>
+        </ul>
+      </div>
+
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-neutral-800">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <span class="w-2 h-2 bg-red-600 rounded-full inline-block"></span>
+          Servicios Estudiantiles
+        </h3>
+        <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">
+          Conoce los servicios y apoyos disponibles para la comunidad universitaria.
+        </p>
+        <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+          <li>• Fraccionamiento de matrícula</li>
+          <li>• Apoyo económico a estudiantes</li>
+          <li>• Movilidad estudiantil</li>
+          <li>• Incapacidades médicas</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Banner CTA -->
+    <div class="bg-red-600 text-white rounded-2xl p-8 text-center">
+      <h2 class="text-xl font-bold mb-2">¿Tienes preguntas sobre normativa?</h2>
+      <p class="text-red-100 text-sm mb-4">
+        CANUTO puede ayudarte con información sobre reglamentos, resoluciones y acuerdos de Unillanos.
+      </p>
+      <div class="flex items-center justify-center gap-4 flex-wrap">
+        <span class="text-sm text-red-100">Haz clic en la garza →</span>
+        <a href="{% url 'chat' %}"
+           class="bg-white text-red-600 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-red-50 transition-colors">
+          Abrir chat completo
+        </a>
+      </div>
+    </div>
+
+    <!-- Toggle modo oscuro -->
+    <div class="mt-8 flex justify-center">
+      <button onclick="toggleTheme()"
+        class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors px-4 py-2 rounded-lg border border-gray-200 dark:border-neutral-700">
+        <svg class="w-4 h-4 theme-icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+        <svg class="w-4 h-4 theme-icon-sun hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+        </svg>
+        <span class="theme-icon-moon">Modo oscuro</span>
+        <span class="theme-icon-sun hidden">Modo claro</span>
+      </button>
+    </div>
+
+  </div><!-- /max-w -->
+
+  <!-- Widget flotante -->
+  {% include "normativa/widget.html" %}
+
+</div>
+{% endblock %}

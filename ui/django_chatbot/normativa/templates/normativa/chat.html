@@ -1,0 +1,295 @@
+{% extends "normativa/base.html" %}
+{% load static %}
+
+{% block title %}CANUTO — Chat Normativo{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-white dark:bg-neutral-950" id="chat-root">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="w-64 flex flex-col border-r border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900 flex-shrink-0">
+
+    <!-- Logo + nombre -->
+    <div class="p-4 border-b border-gray-200 dark:border-neutral-800 flex items-center gap-3">
+      <img src="{% static 'normativa/garza.png' %}" alt="CANUTO" class="w-9 h-9 rounded-full border border-red-600 p-0.5 bg-white">
+      <div>
+        <p class="font-bold text-sm text-gray-900 dark:text-white">CANUTO</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Normativa Unillanos</p>
+      </div>
+    </div>
+
+    <!-- Botón nueva conversación -->
+    <div class="p-3">
+      <button onclick="newConversation()"
+        class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg
+               flex items-center gap-2 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Nueva conversación
+      </button>
+    </div>
+
+    <!-- Lista de conversaciones -->
+    <div class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5" id="conv-list">
+      <!-- Se llena dinámicamente con JS -->
+    </div>
+
+    <!-- Toggle tema + enlace widget -->
+    <div class="p-3 border-t border-gray-200 dark:border-neutral-800 space-y-2">
+      <a href="{% url 'index' %}"
+        class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 transition-colors px-2 py-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+        Ver widget flotante
+      </a>
+      <button onclick="toggleTheme()"
+        class="w-full flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400
+               hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-neutral-700
+               rounded-lg px-3 py-2 transition-colors">
+        <svg class="w-4 h-4 theme-icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+        <svg class="w-4 h-4 theme-icon-sun hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+        </svg>
+        <span class="theme-icon-moon">Modo oscuro</span>
+        <span class="theme-icon-sun hidden">Modo claro</span>
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ===================== ÁREA DE CHAT ===================== -->
+  <main class="flex-1 flex flex-col min-w-0">
+
+    <!-- Barra superior -->
+    <header class="h-14 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
+                   flex items-center justify-between px-6 flex-shrink-0">
+      <h1 class="font-semibold text-gray-900 dark:text-white text-sm truncate" id="chat-title">
+        Chat Normativo Universitario
+      </h1>
+      <span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">CANUTO v2</span>
+    </header>
+
+    <!-- Mensajes -->
+    <div class="flex-1 overflow-y-auto chat-scroll" id="chat-messages">
+      <div class="max-w-3xl mx-auto px-6 py-8 space-y-6">
+
+        <!-- Bienvenida (se oculta al primer mensaje) -->
+        <div id="welcome-screen" class="text-center py-8">
+          <img src="{% static 'normativa/garza.png' %}" alt="CANUTO"
+            class="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-red-600 p-1 bg-white">
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bienvenido a CANUTO</h2>
+          <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">
+            Asistente de normativa universitaria de la Universidad de los Llanos.
+          </p>
+          <!-- Preguntas sugeridas -->
+          <div class="flex flex-wrap justify-center gap-2">
+            {% for q in suggested_questions %}
+            <button onclick="sendSuggestion('{{ q }}')"
+              class="bg-gray-100 dark:bg-neutral-800 hover:bg-red-50 dark:hover:bg-red-900/30
+                     text-gray-700 dark:text-gray-300 text-xs px-3 py-2 rounded-lg transition-colors border
+                     border-gray-200 dark:border-neutral-700">
+              {{ q }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="border-t border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 py-4 flex-shrink-0">
+      <div class="max-w-3xl mx-auto flex gap-3">
+        <input id="chat-input"
+          type="text"
+          placeholder="Escribe tu pregunta sobre normativa universitaria..."
+          class="flex-1 border border-gray-300 dark:border-neutral-700 rounded-xl px-4 py-3 text-sm
+                 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white
+                 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+          onkeydown="if(event.key==='Enter') chatSend()">
+        <button onclick="chatSend()"
+          class="bg-red-600 hover:bg-red-700 text-white rounded-xl px-4 py-3 transition-colors flex-shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Estado de conversaciones (se guarda en sessionStorage)
+  let conversations = JSON.parse(sessionStorage.getItem('canuto-convs') || '[]');
+  let currentConvId = null;
+
+  function saveConversations() {
+    sessionStorage.setItem('canuto-convs', JSON.stringify(conversations));
+  }
+
+  function renderSidebar() {
+    const list = document.getElementById('conv-list');
+    list.innerHTML = '';
+    conversations.forEach(conv => {
+      const btn = document.createElement('button');
+      btn.className = `w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors
+        ${conv.id === currentConvId
+          ? 'bg-gray-200 dark:bg-neutral-800 text-gray-900 dark:text-white font-medium'
+          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-800'}`;
+      btn.innerHTML = `
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        <span class="truncate">${escapeHtml(conv.title)}</span>`;
+      btn.onclick = () => loadConversation(conv.id);
+      list.appendChild(btn);
+    });
+  }
+
+  function newConversation() {
+    const id = Date.now().toString();
+    const conv = { id, title: 'Nueva conversación', messages: [] };
+    conversations.unshift(conv);
+    currentConvId = id;
+    saveConversations();
+    renderSidebar();
+    renderMessages();
+    fetch('/api/reset/', { method: 'POST' });
+    document.getElementById('chat-title').textContent = 'Chat Normativo Universitario';
+  }
+
+  function loadConversation(id) {
+    currentConvId = id;
+    const conv = conversations.find(c => c.id === id);
+    renderSidebar();
+    renderMessages();
+    if (conv) document.getElementById('chat-title').textContent = conv.title;
+  }
+
+  function getCurrentConv() {
+    return conversations.find(c => c.id === currentConvId);
+  }
+
+  function renderMessages() {
+    const conv = getCurrentConv();
+    const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+
+    // Limpiar mensajes anteriores (mantener bienvenida)
+    Array.from(container.children).forEach(el => {
+      if (!el.id) el.remove();
+    });
+
+    const welcome = document.getElementById('welcome-screen');
+    if (!conv || conv.messages.length === 0) {
+      welcome.classList.remove('hidden');
+      return;
+    }
+    welcome.classList.add('hidden');
+
+    conv.messages.forEach(msg => addBubble(msg.role, msg.text));
+  }
+
+  function addBubble(role, text) {
+    const conv = getCurrentConv();
+    const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+    document.getElementById('welcome-screen').classList.add('hidden');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'flex gap-3 ' + (role === 'user' ? 'justify-end' : 'justify-start');
+
+    if (role === 'assistant') {
+      wrap.innerHTML = `
+        <img src="{% static 'normativa/garza.png' %}" alt="CANUTO"
+          class="w-8 h-8 rounded-full flex-shrink-0 mt-1 border border-gray-200 bg-white p-0.5">
+        <div class="max-w-2xl bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700
+                    text-gray-900 dark:text-white rounded-2xl px-4 py-3 text-sm" style="white-space:pre-wrap">${escapeHtml(text)}</div>`;
+    } else {
+      wrap.innerHTML = `
+        <div class="max-w-2xl bg-red-600 text-white rounded-2xl px-4 py-3 text-sm" style="white-space:pre-wrap">${escapeHtml(text)}</div>
+        <div class="w-8 h-8 rounded-full bg-gray-300 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 mt-1 text-xs font-bold text-gray-700 dark:text-gray-300">U</div>`;
+    }
+
+    container.appendChild(wrap);
+    document.getElementById('chat-messages').scrollTop = 99999;
+    return wrap;
+  }
+
+  function addTyping() {
+    const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+    const div = document.createElement('div');
+    div.id = 'typing-indicator';
+    div.className = 'flex gap-3 justify-start';
+    div.innerHTML = `
+      <img src="{% static 'normativa/garza.png' %}" alt="CANUTO"
+        class="w-8 h-8 rounded-full flex-shrink-0 mt-1 border border-gray-200 bg-white p-0.5">
+      <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-2xl px-4 py-3">
+        <div class="flex gap-1">
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+        </div>
+      </div>`;
+    container.appendChild(div);
+    document.getElementById('chat-messages').scrollTop = 99999;
+  }
+
+  async function chatSend() {
+    const input = document.getElementById('chat-input');
+    const question = input.value.trim();
+    if (!question) return;
+
+    // Si no hay conversación activa, crear una
+    if (!currentConvId) newConversation();
+    const conv = getCurrentConv();
+
+    input.value = '';
+    conv.messages.push({ role: 'user', text: question });
+    if (conv.messages.length === 1) {
+      conv.title = question.length > 40 ? question.slice(0, 40) + '...' : question;
+    }
+    saveConversations();
+    addBubble('user', question);
+    addTyping();
+    document.getElementById('chat-title').textContent = conv.title;
+    renderSidebar();
+
+    try {
+      const res = await fetch('/api/query/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      document.getElementById('typing-indicator')?.remove();
+      const answer = data.answer || data.error || 'Error al obtener respuesta.';
+      conv.messages.push({ role: 'assistant', text: answer });
+      saveConversations();
+      addBubble('assistant', answer);
+    } catch (e) {
+      document.getElementById('typing-indicator')?.remove();
+      addBubble('assistant', 'Error de conexión. Verifica que el servidor esté activo.');
+    }
+  }
+
+  function sendSuggestion(text) {
+    document.getElementById('chat-input').value = text;
+    chatSend();
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Inicializar
+  if (conversations.length === 0) newConversation();
+  else { currentConvId = conversations[0].id; renderSidebar(); renderMessages(); }
+</script>
+{% endblock %}
