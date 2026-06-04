@@ -75,11 +75,15 @@ echo.
 echo  3. Probar el chat por terminal (requiere checkpoint entrenado):
 echo     venv\Scripts\python scripts\chat_cli.py
 echo.
-echo  4. Abrir la interfaz web:
-echo     venv\Scripts\python ui\app.py
+echo  4. Abrir la interfaz web CANUTO (principal):
+echo     venv\Scripts\python ui\django_chatbot\run.py
+echo     (abre http://127.0.0.1:8000/)
 echo.
 echo  5. Iniciar la API REST para SIRIUS:
-echo     venv\Scripts\uvicorn src.api.app:app --reload --port 8000
+echo     venv\Scripts\uvicorn src.api.app:app --reload --port 8001
+echo.
+echo  ALTERNATIVA — Interfaz Gradio (simple, sin Django):
+echo     venv\Scripts\python ui\app.py
 echo.
 echo  NOTA: El modelo fine-tuneado debe configurarse en config\config.yaml
 echo        bajo model.checkpoint_path antes de usar el chat.

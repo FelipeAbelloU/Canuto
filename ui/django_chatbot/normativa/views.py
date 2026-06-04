@@ -56,7 +56,12 @@ def chat(request):
         "¿Qué debo hacer si tengo una incapacidad médica?",
         "¿Qué establece el reglamento estudiantil de pregrado?",
     ]
-    return render(request, "normativa/chat.html", {"suggested_questions": suggested})
+    pipeline = _get_pipeline()
+    model_version = pipeline.model_name if pipeline.model else "sin modelo"
+    return render(request, "normativa/chat.html", {
+        "suggested_questions": suggested,
+        "model_version": model_version,
+    })
 
 
 @csrf_exempt

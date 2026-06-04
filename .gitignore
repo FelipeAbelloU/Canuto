@@ -46,3 +46,8 @@ mockup_chatbot/
 
 # Archivos de error Django subidos por accidente
 RecursionError*.pdf
+
+# Cookies y logs temporales de sesión
+cookies.txt
+srv*.txt
+ui_server*.log
