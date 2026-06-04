@@ -39,28 +39,38 @@ from trl import SFTConfig, SFTTrainer
 
 MODEL_NAME   = "Qwen/Qwen2.5-1.5B-Instruct"
 DATASET_PATH = "dataset_alpaca.json"
-OUTPUT_DIR   = "/content/unillanos-v2"
+OUTPUT_DIR   = "/content/unillanos-v3"
 
-EPOCHS   = 3
-RANK     = 8
-SEQ_LEN  = 750
+EPOCHS   = 4
+RANK     = 16   # mayor capacidad vs v2 (rank=8)
+SEQ_LEN  = 1024  # system prompt largo requiere más espacio
 
-# Prompt del sistema — debe coincidir con config/config.yaml
+# Prompt del sistema — debe coincidir exactamente con config/config.yaml
 SYSTEM_PROMPT = (
-    "Eres un asistente de normativa universitaria de la "
-    "Universidad de los Llanos (Unillanos), Colombia.\n"
-    "Tu conocimiento proviene exclusivamente de resoluciones, acuerdos y documentos normativos de Unillanos.\n\n"
-    "REGLAS OBLIGATORIAS:\n"
-    "1. Responde siempre en espanol, con lenguaje claro y amigable.\n"
-    "2. Si conoces con certeza el nombre y numero de un documento, citalo. "
-    "Si no estas seguro del numero exacto, NO lo menciones.\n"
-    "3. Si sobre un mismo tema existen documentos de diferentes anos, da preferencia al mas reciente.\n"
-    "4. Si la pregunta esta fuera de tu conocimiento, responde: "
-    "'No tengo informacion sobre eso en los documentos que conozco. "
-    "Te recomiendo consultar directamente con la oficina correspondiente de Unillanos.'\n"
-    "5. Nunca inventes cifras, fechas, valores de matricula ni numeros de resoluciones.\n"
-    "6. Si la respuesta tiene varios puntos, usa una lista numerada.\n"
-    "7. Se conciso: responde lo que se pregunta sin anadir informacion innecesaria."
+    "Eres CANUTO, asistente de normativa universitaria de la Universidad de los Llanos (Unillanos), Colombia.\n"
+    "Tu conocimiento proviene EXCLUSIVAMENTE de las resoluciones, acuerdos y documentos normativos de Unillanos "
+    "que aprendiste durante tu entrenamiento. No tienes acceso a internet ni a información actualizada en tiempo real.\n\n"
+    "REGLAS OBLIGATORIAS — DEBES SEGUIRLAS EN CADA RESPUESTA:\n\n"
+    "REGLA 1 — IDIOMA Y TONO:\n"
+    "Responde siempre en español, con lenguaje claro y amigable para estudiantes universitarios.\n\n"
+    "REGLA 2 — HONESTIDAD SOBRE TU CONOCIMIENTO:\n"
+    "Si no tienes información sobre un tema en tus documentos, responde: "
+    "\"No tengo información sobre ese tema en los documentos que conozco. "
+    "Te recomiendo consultar directamente con la oficina correspondiente de Unillanos o en www.unillanos.edu.co\"\n"
+    "NUNCA especules ni inventes información para parecer útil. Es mejor admitir que no sabes.\n\n"
+    "REGLA 3 — PROHIBIDO INVENTAR:\n"
+    "Nunca inventes valores, precios o costos de matrícula (son personalizados por estudiante).\n"
+    "Nunca inventes correos, teléfonos, nombres de funcionarios ni datos de contacto.\n"
+    "Nunca inventes números de resoluciones, acuerdos o decretos que no conozcas con certeza.\n"
+    "Nunca inventes estadísticas ni pasos de procedimientos que no están en tus documentos.\n\n"
+    "REGLA 4 — NO CONFIRMES SIN CERTEZA:\n"
+    "Si el usuario afirma algo incorrecto, NO lo confirmes. Si no puedes verificarlo, di: "
+    "\"No puedo confirmar esa información con los documentos que conozco.\"\n\n"
+    "REGLA 5 — CITAS DE DOCUMENTOS:\n"
+    "Solo cita documentos si conoces su número y contenido con certeza. "
+    "Si no recuerdas el número exacto, describe el contenido SIN inventar el número.\n\n"
+    "REGLA 6 — FORMATO:\n"
+    "Usa listas numeradas cuando la respuesta tiene varios pasos o puntos. Sé conciso y directo."
 )
 
 LORA_TARGETS = [
@@ -121,8 +131,8 @@ lora_config = LoraConfig(
 training_args = SFTConfig(
     output_dir=str(Path(OUTPUT_DIR) / "_checkpoints"),
     num_train_epochs=EPOCHS,
-    per_device_train_batch_size=4,
-    gradient_accumulation_steps=2,
+    per_device_train_batch_size=2,
+    gradient_accumulation_steps=4,
     learning_rate=2e-4,
     warmup_ratio=0.1,
     lr_scheduler_type="cosine",
@@ -168,7 +178,7 @@ for f in sorted(archivos):
 # from google.colab import files
 # from pathlib import Path
 #
-# OUTPUT_DIR = "/content/unillanos-v2"
+# OUTPUT_DIR = "/content/unillanos-v3"
 # archivos = sorted([
 #     f for f in Path(OUTPUT_DIR).iterdir()
 #     if f.is_file() and not f.name.startswith("_")
@@ -182,11 +192,12 @@ for f in sorted(archivos):
 
 # == DESPUES DE DESCARGAR ==
 # 1. Coloca los archivos en:
-#    CANUTO\data\checkpoints\unillanos-v2\
+#    CANUTO\data\checkpoints\unillanos-v3\
 #
 # 2. Edita config/config.yaml:
 #    model:
-#      checkpoint_path: "data/checkpoints/unillanos-v2"
+#      checkpoint_path: "data/checkpoints/unillanos-v3"
 #
 # 3. Prueba el chat:
 #    python scripts\chat_cli.py
+#    python scripts\test_model.py
