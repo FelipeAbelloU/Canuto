@@ -6,7 +6,7 @@ Uso:
     python scripts/extract_text.py --ocr-engine tesseract
 
 El script detecta automáticamente si cada PDF es digital o escaneado.
-Los archivos ya procesados se omiten (para reejecutar, borra el .txt correspondiente).
+Los archivos ya procesados se omiten (para reejecutar hay que borrar el .txt correspondiente).
 """
 import sys
 import io
