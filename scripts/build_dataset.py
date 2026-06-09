@@ -10,7 +10,7 @@ Modos:
     template   — genera entradas vacías para completar manualmente
 
 El dataset se guarda en data/dataset/dataset_alpaca.json (o sharegpt).
-Este archivo es el que se usa para fine-tuning.
+Este archivo es el que se usa para fine-tuning (Colab o Local dependiendo de los recursos).
 """
 import sys
 from pathlib import Path

@@ -1,0 +1,988 @@
+================================================================
+  CANUTO — Guia de Arquitectura y Desarrollo
+  Para programadores que se integran al proyecto desde cero
+================================================================
+  Proyecto : Chatbot Asistente Normativo Universidad de los Llanos
+  Autor    : Cristian Felipe Abello Gamba
+  Programa : Ingenieria de Sistemas — Unillanos
+  Version  : Actualizada 2026-06-09 (modelo v3 en entrenamiento)
+================================================================
+
+INDICE
+------
+  1.  Que es CANUTO y cual es el problema que resuelve
+  2.  La decision tecnica central: fine-tuning vs RAG
+  3.  Tecnologias usadas y por que se eligio cada una
+  4.  Arquitectura general del sistema
+  5.  Los dos modos de operacion: offline y runtime
+  6.  Carpeta raiz — que hace cada cosa
+  7.  config/ — como se configura el sistema
+  8.  src/    — el nucleo del sistema (modulo a modulo)
+  9.  scripts/ — las herramientas de linea de comandos
+  10. ui/     — las interfaces de usuario
+  11. data/   — los datos del proyecto
+  12. PDF/    — los documentos fuente
+  13. docs/   — documentacion tecnica
+  14. Flujo completo de una pregunta hasta la respuesta
+  15. Como agregar nuevos documentos al conocimiento del modelo
+  16. Como reentrenar el modelo
+  17. Errores comunes y como interpretarlos
+
+
+================================================================
+1. QUE ES CANUTO Y CUAL ES EL PROBLEMA QUE RESUELVE
+================================================================
+
+La Universidad de los Llanos produce decenas de documentos normativos
+al ano: resoluciones rectorales, acuerdos del consejo academico,
+reglamentos, convocatorias. Estos documentos viven en PDFs dispersos
+en multiples portales, tienen nombres poco descriptivos, y nadie los
+lee completos.
+
+Consecuencias reales:
+  - Un estudiante no sabe cuantos dias tiene para presentar una
+    incapacidad medica y pierde el proceso.
+  - Alguien paga la matricula de corrido sin saber que podia
+    fraccionarla en tres cuotas.
+  - Un egresado retrasa su grado porque no conoce el requisito de
+    segunda lengua hasta el ultimo semestre.
+  - Las oficinas administrativas reciben las mismas preguntas
+    repetitivas cientos de veces.
+
+CANUTO resuelve esto con un chatbot conversacional: el usuario escribe
+su pregunta en lenguaje natural y recibe la respuesta con la fuente
+normativa que la respalda, sin buscar en PDFs.
+
+CANUTO es el producto de un proyecto de grado de Ingenieria de
+Sistemas. Como tal, tiene dos objetivos paralelos:
+  a) Ser un sistema funcional y util para la comunidad de Unillanos.
+  b) Demostrar la aplicacion de tecnicas de NLP/ML (fine-tuning de
+     LLMs) en un contexto institucional real.
+
+
+================================================================
+2. LA DECISION TECNICA CENTRAL: FINE-TUNING VS RAG
+================================================================
+
+Existen dos enfoques principales para construir un chatbot que
+responda preguntas sobre documentos especificos:
+
+ENFOQUE A — RAG (Retrieval-Augmented Generation):
+  El modelo NO aprende el contenido. En cada consulta, busca
+  fragmentos relevantes en una base de datos vectorial y los
+  incluye en el contexto para generar la respuesta.
+  Ventaja: facil de actualizar (agrega documentos, re-indexa).
+  Desventaja: requiere infraestructura adicional (vector store),
+  y la calidad depende de que tan bien se recuperan los fragmentos.
+
+ENFOQUE B — Fine-tuning supervisado (SFT + LoRA):
+  El modelo se entrena con pares pregunta-respuesta derivados de
+  los documentos. El conocimiento queda "internalizado" en los
+  pesos del modelo.
+  Ventaja: alinea con el objetivo academico (entrenar un modelo
+  generativo), sin infraestructura adicional en produccion.
+  Desventaja: actualizar el conocimiento requiere reentrenar.
+
+CANUTO usa fine-tuning porque:
+  1. El objetivo 2 de la propuesta de grado dice explicitamente
+     "disenar y entrenar un modelo de lenguaje generativo".
+  2. El corpus normativo de Unillanos es relativamente estable
+     (pocos documentos nuevos al semestre).
+  3. Simplifica el deployment: solo un modelo, sin vector stores.
+
+Esta decision esta documentada academicamente en:
+  docs/seleccion_modelo_llm.md
+
+LIMITACION CONOCIDA:
+  El fine-tuning con LoRA es mejor para adaptar comportamiento
+  (tono, formato, estilo) que para inyectar conocimiento factual
+  (segun literatura de 2025). Por eso las respuestas pueden ser
+  correctas en formato pero imprecisas en contenido si el dataset
+  de entrenamiento tiene errores o es muy pequeno. La solucion es
+  un dataset curado y suficientemente grande.
+
+
+================================================================
+3. TECNOLOGIAS USADAS Y POR QUE SE ELIGIO CADA UNA
+================================================================
+
+PYTHON 3.11
+  Por que: lenguaje dominante en IA/ML, con el ecosistema mas
+  completo de librerias para modelos de lenguaje. La mayoria de
+  los frameworks de IA (HuggingFace, PyTorch, etc.) son Python-first.
+
+PYTORCH
+  Que es: libreria de calculo tensorial y diferenciacion automatica.
+  Es la base sobre la que corre el modelo de lenguaje.
+  Por que: es el estandar de facto en investigacion de IA. HuggingFace
+  (que usamos para cargar el modelo) usa PyTorch internamente.
+  Instalacion especial: se instala con un URL especifico segun si la
+  maquina tiene GPU CUDA o solo CPU. Ver install.bat o requirements.txt.
+
+HUGGINGFACE TRANSFORMERS + ACCELERATE
+  Que es: libreria que permite cargar, usar y ajustar miles de modelos
+  de lenguaje pre-entrenados con una API unificada.
+  Por que: abstrae toda la complejidad de cargar arquitecturas de redes
+  neuronales. Dos lineas de codigo cargan un modelo de 1.5B parametros.
+  Accelerate gestiona automaticamente si el modelo corre en CPU o GPU.
+
+MODELO BASE: Qwen/Qwen2.5-1.5B-Instruct
+  Que es: modelo de lenguaje de 1,540 millones de parametros creado
+  por Alibaba Cloud. Entrenado en +29 idiomas incluyendo espanol.
+  Por que este modelo y no otro:
+    - 1.5B es el tamano mas pequeno que da respuestas coherentes en
+      espanol y cabe en la RAM de la laptop de desarrollo (16 GB).
+    - La variante "Instruct" ya sabe seguir instrucciones (ideal para
+      chatbots), a diferencia de la variante base que solo completa texto.
+    - Licencia Apache 2.0: uso libre incluyendo proyectos academicos.
+    - Arquitectura compatible con HuggingFace y LLaMA-Factory.
+  Version futura: Qwen2.5-7B-Instruct en la workstation RTX 4090i.
+
+PEFT (Parameter-Efficient Fine-Tuning) + LoRA
+  Que es: libreria para entrenar solo una fraccion de los parametros
+  del modelo en lugar de todos.
+  Por que LoRA: el modelo completo tiene 1,540 millones de parametros.
+  Entrenarlos todos requeriria decenas de GB de VRAM y horas. LoRA
+  agrega matrices pequenas ("adaptadores") a ciertas capas del modelo
+  y solo entrena esas matrices. Con rank=16, se entrenan ~13 millones
+  de parametros (<1% del total) en ~25 minutos en una GPU T4 gratuita.
+  Resultado: el modelo aprende las respuestas de normativa sin olvidar
+  su capacidad general de comprension y generacion en espanol.
+
+TRL (Training and Reinforcement Learning for LLMs)
+  Que es: libreria de HuggingFace que simplifica el fine-tuning de
+  modelos de lenguaje con supervision (SFT = Supervised Fine-Tuning).
+  Por que: el SFTTrainer de TRL se encarga automaticamente de formatear
+  los ejemplos segun el template del modelo (chat_template de Qwen2.5),
+  truncar secuencias largas, y gestionar el entrenamiento por lotes.
+
+GOOGLE COLAB (T4 GPU gratuita)
+  Por que: el entrenamiento requiere GPU. La laptop no tiene GPU util,
+  y la workstation de la universidad no siempre esta disponible. Colab
+  ofrece una GPU Tesla T4 (16 GB VRAM) gratis por sesiones de ~4 horas,
+  suficiente para entrenar el modelo en ~25-35 minutos.
+
+DJANGO 5.x
+  Que es: framework web de Python para construir aplicaciones web.
+  Por que Django y no Flask/FastAPI para la UI: Django incluye motor
+  de templates HTML, gestion de archivos estaticos (CSS, imagenes) y
+  un servidor de desarrollo integrado. Para una interfaz web completa
+  con multiples paginas, Django es mas adecuado que Flask.
+  Donde se usa: ui/django_chatbot/ — la interfaz principal de CANUTO.
+
+FASTAPI
+  Que es: framework web de Python especializado en APIs REST, con
+  documentacion automatica y validacion de tipos.
+  Por que ademas de Django: la UI de CANUTO corre con Django, pero
+  SIRIUS (el sistema de informacion de Unillanos) necesita consumir
+  CANUTO como un microservicio independiente. FastAPI expone esos
+  endpoints con documentacion Swagger automatica en /docs.
+  Donde se usa: src/api/app.py
+
+GRADIO
+  Que es: libreria para crear interfaces web de demostracion de
+  modelos de IA con pocas lineas de codigo.
+  Por que: es la forma mas rapida de probar el modelo con una interfaz
+  visual sin configurar toda la aplicacion Django. Usado como
+  alternativa de desarrollo rapido.
+  Donde se usa: ui/app.py
+
+PDFPLUMBER + PYPDF
+  Que son: librerias para extraer texto de PDFs con capa de texto
+  digital (PDFs donde el texto es seleccionable con el cursor).
+  Por que dos librerias: pdfplumber maneja mejor tablas y layouts
+  complejos; pypdf es mas rapido para texto simple. El script de
+  extraccion intenta pdfplumber primero y pypdf como respaldo.
+  Donde se usan: src/extraction/pdf_digital.py
+
+EASYOCR + PYMUPDF
+  Que son: motor de OCR (reconocimiento optico de caracteres) para
+  extraer texto de PDFs escaneados (imagenes de documentos fisicos).
+  Por que: algunos documentos normativos de Unillanos son escaneos de
+  papel. Sin OCR, solo se obtiene una imagen; EasyOCR convierte
+  esa imagen en texto.
+  Donde se usan: src/extraction/pdf_scanned.py
+
+YAML (pyyaml)
+  Que es: formato de configuracion legible por humanos.
+  Por que: permite editar la configuracion del sistema (que modelo
+  usar, en que dispositivo, el system prompt) sin tocar codigo Python.
+  Donde se usa: config/config.yaml, config/laptop.yaml, workstation.yaml
+
+TAILWIND CSS (via CDN en templates)
+  Que es: framework de CSS basado en clases utilitarias.
+  Por que: permite disenar la interfaz web directamente en el HTML
+  sin escribir CSS personalizado. El chat tiene diseno profesional
+  (modo oscuro, sidebar, burbujas de chat) gracias a Tailwind.
+  Donde se usa: ui/django_chatbot/normativa/templates/
+
+
+================================================================
+4. ARQUITECTURA GENERAL DEL SISTEMA
+================================================================
+
+CANUTO tiene dos partes claramente separadas:
+
+PARTE 1 — PIPELINE OFFLINE (preparacion de datos y entrenamiento)
+  Se ejecuta UNA VEZ cada vez que se quiere mejorar el modelo.
+  No esta activo cuando el chatbot esta en uso.
+
+  [PDFs] → extract_text.py → [textos .txt]
+         → build_dataset.py → [dataset JSON]
+         → add_knowledge.py → [dataset enriquecido]
+         → colab_train_v3.ipynb (en Google Colab) → [checkpoint]
+         → descargar checkpoint → [data/checkpoints/unillanos-vX/]
+
+PARTE 2 — SISTEMA RUNTIME (el chatbot en funcionamiento)
+  Se activa cuando el usuario corre el servidor y hace preguntas.
+
+  [config/config.yaml]
+         ↓ carga configuracion
+  [src/factory.py → create_pipeline()]
+         ↓ instancia los componentes
+  [src/inference/model.py → FineTunedModel]  ← carga checkpoint
+  [src/chat/pipeline.py → ChatPipeline]      ← gestiona conversacion
+         ↓ expuesto a traves de
+  [ui/django_chatbot/] (interfaz web, puerto 8000)
+  [src/api/app.py]     (API REST para SIRIUS, puerto 8001)
+  [ui/app.py]          (interfaz Gradio alternativa, puerto 7860)
+
+PATRON SINGLETON:
+  El modelo (3 GB) se carga en RAM una sola vez al llegar la primera
+  peticion, y permanece cargado mientras el servidor este activo. Las
+  siguientes preguntas son mas rapidas porque el modelo ya esta en RAM.
+  Esto se implementa con una variable global _pipeline = None que se
+  inicializa en la primera llamada a _get_pipeline().
+
+
+================================================================
+5. LOS DOS MODOS DE OPERACION: OFFLINE Y RUNTIME
+================================================================
+
+MODO OFFLINE (construccion del conocimiento)
+  Cuando ejecutar: antes de cada nuevo entrenamiento del modelo.
+  Quien lo ejecuta: el estudiante desarrollador.
+  Duracion: extraccion ~5 min, generacion dataset ~2 min,
+            entrenamiento ~25-35 min en Colab.
+
+  Paso 1 — Extraccion de texto:
+    python scripts\extract_text.py
+    Lee los PDFs de PDF/, extrae el texto y lo guarda en data/extracted/
+    como archivos .txt, uno por documento.
+
+  Paso 2 — Generacion del dataset:
+    python scripts\build_dataset.py --mode heuristic
+    Lee los .txt de data/extracted/ y genera pares pregunta-respuesta
+    automaticamente usando heuristicas (busca titulos, articulos,
+    secciones). Guarda el resultado en data/dataset/dataset_alpaca.json
+
+  Paso 3 — Enriquecimiento curado:
+    python scripts\add_knowledge.py
+    Agrega pares QA escritos manualmente por el desarrollador, que
+    cubren casos criticos: preguntas fuera de dominio, correcciones de
+    informacion falsa, casos de borde. Imprescindible para que el modelo
+    sepa decir "no tengo esa informacion" en lugar de inventar.
+
+  Paso 4 — Entrenamiento en Colab:
+    Subir data/dataset/dataset_alpaca.json a Google Colab y ejecutar
+    scripts/colab_train_v3.ipynb. El notebook hace todo automaticamente.
+    Al final descarga el checkpoint (directorio con varios archivos .safetensors).
+
+  Paso 5 — Desplegar:
+    Mover el checkpoint descargado a data/checkpoints/unillanos-vX/
+    Editar config/config.yaml: checkpoint_path: "data/checkpoints/unillanos-vX"
+    Reiniciar el servidor.
+
+MODO RUNTIME (el chatbot respondiendo preguntas)
+  Cuando ejecutar: cuando se quiere usar el chatbot.
+  Como iniciarlo: venv\Scripts\activate && python ui\django_chatbot\run.py
+  El servidor queda escuchando en http://127.0.0.1:8000
+
+
+================================================================
+6. CARPETA RAIZ — QUE HACE CADA COSA
+================================================================
+
+CANUTO/
+  CLAUDE.md              Instrucciones para el asistente de IA Claude Code.
+                         No afecta el funcionamiento del chatbot. Es como
+                         un manual de contexto para la herramienta de desarrollo.
+
+  CLAUDE.md (raiz Tesis) Hay otro CLAUDE.md un nivel arriba, en Tesis/.
+                         Ese aplica a toda la tesis; este solo a CANUTO.
+
+  requirements.txt       Lista de librerias Python necesarias.
+                         Se instala con: pip install -r requirements.txt
+                         Ojo: PyTorch va ANTES de este archivo. Ver install.bat.
+
+  install.bat            Script de instalacion para Windows. Ejecutar una sola
+                         vez en maquina nueva. Crea venv, instala PyTorch segun
+                         hardware (CPU o CUDA), luego instala requirements.txt.
+
+  .env.example           Plantilla de variables de entorno. Copiar como ".env"
+                         si se necesitan variables de configuracion sensibles.
+                         Actualmente el proyecto no requiere .env en desarrollo.
+
+  .gitignore             Lista de lo que git NO debe subir a GitHub:
+                         venv/, data/checkpoints/, data/extracted/, __pycache__/,
+                         mockup_chatbot/, cookies.txt, logs temporales.
+
+  config/                Ver seccion 7.
+  src/                   Ver seccion 8.
+  scripts/               Ver seccion 9.
+  ui/                    Ver seccion 10.
+  data/                  Ver seccion 11.
+  PDF/                   Ver seccion 12.
+  docs/                  Ver seccion 13.
+  memory/                Archivos de contexto para Claude Code (no afectan CANUTO).
+  notas y ayudas/        Guias de uso, esta guia, y scripts de referencia.
+
+
+================================================================
+7. config/ — COMO SE CONFIGURA EL SISTEMA
+================================================================
+
+La carpeta config/ contiene tres archivos YAML. El sistema los carga
+en orden: primero config.yaml (configuracion base), luego el perfil
+de hardware seleccionado (laptop.yaml o workstation.yaml) que
+sobrescribe las secciones relevantes.
+
+config.yaml  ← EL ARCHIVO MAS IMPORTANTE
+  Contiene toda la configuracion del sistema en un solo lugar.
+  Secciones principales:
+
+  hardware_profile: "laptop"
+    Define que perfil de hardware usar. Cambiar a "workstation" para
+    usar la GPU del laboratorio. El sistema carga automaticamente el
+    archivo .yaml del perfil seleccionado.
+
+  model:
+    checkpoint_path: "data/checkpoints/unillanos-v3"
+      La ruta al directorio del modelo entrenado. DEBE existir este
+      directorio con los archivos del checkpoint. Si esta vacio o la
+      ruta no existe, el chatbot responde "modelo no disponible".
+    device: cpu
+      "cpu" para laptop, "cuda" para workstation con GPU.
+    max_new_tokens: 512
+      Longitud maxima de la respuesta generada. 256 en laptop (mas rapido),
+      512 en workstation.
+    temperature: 0.3
+      Controla la aleatoriedad. 0.0 = siempre la misma respuesta (deterministico).
+      1.0 = muy creativo pero puede inventar. 0.3 es conservador y preciso.
+    top_p: 0.85
+      Filtra tokens improbables. Combinado con temperature, reduce alucinaciones.
+
+  chat:
+    system_prompt: |
+      Las instrucciones que CANUTO recibe en CADA conversacion.
+      Aqui se definen las 6 reglas de comportamiento: no inventar,
+      honestidad sobre el conocimiento, citar solo documentos conocidos,
+      rechazar preguntas fuera del dominio, etc.
+      IMPORTANTE: este system_prompt debe ser IDENTICO al que se usa
+      durante el entrenamiento en colab_train_v3.ipynb. Si difieren,
+      el modelo puede comportarse diferente en entrenamiento y en produccion.
+
+laptop.yaml
+  Sobrescribe los parametros de modelo para la laptop i5-7200U:
+  device: cpu, max_new_tokens: 256
+  Se activa automaticamente cuando hardware_profile: "laptop" en config.yaml.
+
+workstation.yaml
+  Sobrescribe los parametros para la workstation RTX 4090i:
+  device: cuda, max_new_tokens: 512
+  Se activa cuando hardware_profile: "workstation" en config.yaml.
+
+Como funciona el merge de configuraciones (src/config_loader.py):
+  1. Lee config.yaml completo.
+  2. Lee el valor de hardware_profile (ej: "laptop").
+  3. Lee laptop.yaml.
+  4. Hace un "deep merge": los valores de laptop.yaml sobrescriben
+     los valores de config.yaml seccion por seccion.
+  5. Retorna la configuracion combinada como diccionario Python.
+
+
+================================================================
+8. src/ — EL NUCLEO DEL SISTEMA (MODULO A MODULO)
+================================================================
+
+src/ es la libreria del proyecto. Contiene el codigo que implementa
+toda la logica del sistema. Los scripts en scripts/ y las interfaces
+en ui/ importan desde src/.
+
+Estructura:
+  src/
+    __init__.py          Marca src/ como paquete Python importable.
+    config_loader.py     Lee y combina los archivos de configuracion.
+    factory.py           Punto de entrada: crea el pipeline completo.
+    extraction/          Extraccion de texto de PDFs.
+    dataset/             Generacion de dataset de entrenamiento.
+    inference/           Carga y ejecucion del modelo entrenado.
+    chat/                Pipeline conversacional.
+    api/                 API REST para integracion con SIRIUS.
+
+--- src/config_loader.py ---
+  Funcion: load_config(config_path)
+  Que hace:
+    1. Lee config.yaml.
+    2. Sustituye variables de entorno (${VARIABLE}) si las hay.
+    3. Lee el perfil de hardware y hace merge.
+    4. Retorna un diccionario con toda la configuracion lista.
+  Por que existe separado: desacopla "como se lee la configuracion" de
+  "como se usa". Cualquier componente que necesite config solo importa
+  esta funcion.
+
+--- src/factory.py ---
+  Funcion: create_pipeline(config_path)
+  Que hace:
+    1. Llama a load_config() para obtener la configuracion.
+    2. Si hay un checkpoint_path configurado, crea un FineTunedModel.
+    3. Crea un ChatPipeline pasandole el modelo y el system_prompt.
+    4. Retorna el ChatPipeline listo para usar.
+  Por que existe: es el unico punto donde se ensamblan todos los
+  componentes. La UI, la API y los scripts solo llaman create_pipeline()
+  y obtienen un objeto listo. No necesitan saber como se construye.
+  Patron: Abstract Factory.
+
+--- src/inference/model.py (clase FineTunedModel) ---
+  Que hace: carga el checkpoint del modelo entrenado y genera texto.
+  Atributos clave:
+    checkpoint_path: ruta al directorio del checkpoint.
+    device: "cpu" o "cuda".
+    max_new_tokens, temperature, top_p: parametros de generacion.
+    _model, _tokenizer: el modelo y tokenizador de HuggingFace.
+    _loaded: flag para no cargar dos veces (lazy loading).
+
+  Metodo _load():
+    Se ejecuta solo la primera vez que se pide una respuesta.
+    Carga el tokenizador (convierte texto a tokens numericos y viceversa)
+    y el modelo (la red neuronal con todos sus pesos entrenados).
+    En CPU usa float32 (mas preciso pero mas lento).
+    En GPU usa bfloat16 (mitad de memoria, misma calidad en la practica).
+
+  Metodo is_available():
+    Verifica que el checkpoint_path exista en disco.
+    Usado por el pipeline para decidir si responder o mostrar error.
+
+  Metodo chat(messages):
+    Recibe lista de mensajes [{role, content}] incluyendo el system prompt
+    y el historial de la conversacion. Aplica el chat_template de Qwen2.5
+    para formatearlos al formato que el modelo espera, genera la respuesta,
+    y decodifica los tokens de vuelta a texto.
+
+--- src/chat/pipeline.py (clase ChatPipeline) ---
+  Que hace: orquesta la conversacion completa.
+  Metodo query(question):
+    1. Verifica que el modelo este disponible.
+    2. Construye la lista de mensajes: system_prompt + historial + pregunta.
+    3. Llama a model.chat(messages) y obtiene la respuesta.
+    4. Guarda el par pregunta-respuesta en el historial.
+    5. Retorna la respuesta.
+  Metodo reset_history():
+    Borra el historial de la conversacion actual.
+    Llamado cuando el usuario hace clic en "Nueva conversacion".
+
+--- src/chat/history.py (clase ConversationHistory) ---
+  Que hace: almacena los turnos anteriores de la conversacion.
+  Por que es importante: el modelo es "sin estado" (no recuerda nada
+  entre llamadas). Para que el chat sea coherente, cada llamada al
+  modelo incluye los ultimos N turnos del historial.
+  Parametro max_turns: cuantos turnos guardar (configurado en config.yaml
+  como max_history: 5).
+
+--- src/extraction/pdf_digital.py ---
+  Que hace: extrae texto de PDFs con texto seleccionable.
+  Estrategia: intenta pdfplumber primero (mejor para tablas y columnas),
+  si falla o da muy poco texto usa pypdf como respaldo.
+  Cuando se usa: durante el pipeline offline, al correr extract_text.py.
+  NO se usa en runtime (el modelo ya aprendio el contenido).
+
+--- src/extraction/pdf_scanned.py ---
+  Que hace: extrae texto de PDFs que son imagenes (documentos escaneados).
+  Estrategia: usa pymupdf para convertir cada pagina del PDF en imagen,
+  luego easyocr para reconocer el texto en la imagen.
+  Nota: es mas lento que la extraccion digital (~30 segundos por pagina).
+  Cuando se usa: idem, solo durante el pipeline offline.
+
+--- src/dataset/cleaner.py ---
+  Que hace: limpia el texto extraido de los PDFs.
+  Elimina: numeros de pagina, encabezados/pies repetidos, espacios
+  multiples, caracteres especiales de escaneo, lineas vacias excesivas.
+  Por que importa: texto sucio genera pares QA de mala calidad, lo que
+  hace que el modelo aprenda respuestas con errores.
+
+--- src/dataset/qa_builder.py ---
+  Que hace: transforma el texto limpio en pares pregunta-respuesta.
+  Estrategia heuristica: detecta patrones en el texto normativo (titulos
+  de articulos, CONSIDERANDO, RESUELVE, numerales, secciones) y genera
+  preguntas del tipo "¿Que establece el articulo X?" con la respuesta
+  siendo el contenido de ese articulo.
+  Formato de salida: Alpaca JSON [{instruction, input, output}].
+    instruction: la pregunta.
+    input: contexto adicional (generalmente vacio).
+    output: la respuesta esperada.
+  Limitacion conocida: las preguntas heuristicas son genericas. Por eso
+  existe add_knowledge.py para agregar pares curados manualmente.
+
+--- src/api/app.py ---
+  Que hace: expone CANUTO como microservicio HTTP.
+  Framework: FastAPI (genera documentacion Swagger automatica en /docs).
+  Endpoints:
+    GET  /        Estado del servicio (health check basico).
+    GET  /health  Estado detallado: si el modelo esta cargado y listo.
+    POST /query   Recibe {"question": "..."} y retorna la respuesta.
+    POST /reset   Reinicia el historial de conversacion.
+  Para que: cuando SIRIUS integre CANUTO, llamara a estos endpoints
+  desde su backend Django 2.2. No accede al modelo directamente; llama
+  a la API REST igual que cualquier cliente HTTP.
+  Como correr: uvicorn src.api.app:app --reload --port 8001
+  Documentacion interactiva: http://127.0.0.1:8001/docs
+
+
+================================================================
+9. scripts/ — LAS HERRAMIENTAS DE LINEA DE COMANDOS
+================================================================
+
+Todos los scripts se ejecutan desde la raiz de CANUTO con el venv activo:
+  cd C:\Users\Equipo\OneDrive\Documentos\Tesis\CANUTO
+  venv\Scripts\activate
+  python scripts\<nombre>.py
+
+--- scripts/extract_text.py ---
+  Uso: python scripts\extract_text.py
+  Que hace: itera todos los PDFs en PDF/, detecta si cada uno es
+  digital o escaneado, aplica la extraccion adecuada, limpia el texto
+  y lo guarda en data/extracted/ como <nombre_documento>.txt
+  Cuando correr: cada vez que se agregan nuevos PDFs a PDF/.
+  Salida: data/extracted/*.txt (uno por PDF, ignorados por git).
+
+--- scripts/build_dataset.py ---
+  Uso: python scripts\build_dataset.py --mode heuristic
+  Que hace: lee todos los .txt de data/extracted/, aplica qa_builder.py
+  para generar pares QA automaticamente, y guarda el resultado en
+  data/dataset/dataset_alpaca.json.
+  Nota: sobreescribe el dataset existente. Si hay pares curados
+  (add_knowledge.py), se deben volver a agregar despues de regenerar.
+  Cuando correr: cuando se agregan nuevos PDFs o se quiere regenerar
+  el dataset base desde cero.
+
+--- scripts/add_knowledge.py ---
+  Uso: python scripts\add_knowledge.py
+  Que hace: agrega pares QA curados manualmente al dataset existente.
+  Contiene: ~55 pares escritos a mano que cubren:
+    - Preguntas frecuentes sobre matricula (valor personalizado, SISBEN)
+    - Fraccionamiento de matricula (Res. Rectoral 074/2026)
+    - Incapacidades medicas (Res. Rectoral 068/2025)
+    - Segunda lengua y Plan BULL (Acuerdo Academico 003/2023)
+    - Opciones de grado FCBI (Res. CF-061/2025)
+    - Movilidad estudiantil (Acuerdo Academico 014/2021)
+    - ~30 preguntas FUERA DEL DOMINIO con respuesta "No tengo informacion"
+      (fundamental para que el modelo no alucine en temas ajenos)
+    - Preguntas "trampa" que el usuario podria hacer con datos falsos
+  Proteccion contra duplicados: verifica por instruction antes de agregar.
+  Cuando correr: despues de build_dataset.py, o cuando se quieran
+  agregar nuevos casos sin regenerar el dataset completo.
+
+--- scripts/colab_train_v3.ipynb ---
+  Que es: notebook de Jupyter listo para subir y ejecutar en Google Colab.
+  Estructura (5 celdas):
+    Celda 1: verifica que hay GPU T4, instala peft y trl.
+    Celda 2: sube dataset_alpaca.json desde el laptop.
+    Celda 3: entrenamiento completo (carga modelo, LoRA, SFTTrainer, merge).
+    Celda 4: prueba rapida con 4 preguntas criticas ANTES de descargar.
+    Celda 5: descarga el checkpoint archivo por archivo al laptop.
+  Parametros actuales (version v3):
+    Modelo base : Qwen/Qwen2.5-1.5B-Instruct
+    LoRA rank   : 16 (mayor capacidad que v2, rank=8)
+    SEQ_LEN     : 1024 tokens (el system prompt es largo)
+    Batch       : 2 (reducido para caber con SEQ_LEN=1024 en T4)
+    Grad. accum : 4 (batch efectivo = 8, igual que v2)
+    Epocas      : 4
+    Temperatura : 0.3 (conservador, reduce alucinaciones)
+  El notebook esta disenado para alguien que no sabe de ML: cada celda
+  tiene comentarios explicando que hace y por que.
+
+--- scripts/colab_train.py ---
+  Version alternativa del entrenamiento en formato .py comentado.
+  Util si se prefiere copiar-pegar en celdas de Colab manualmente.
+  Contiene los mismos parametros que el .ipynb.
+
+--- scripts/train.py ---
+  Entrenamiento LOCAL en CPU (sin Colab, sin GPU).
+  Tiempo estimado: 15-30 HORAS en el laptop i5-7200U.
+  Uso: python scripts\train.py --smoke (prueba rapida de 3 pasos)
+       python scripts\train.py          (entrenamiento completo)
+  Cuando usar: solo si no hay acceso a Colab y se necesita verificar
+  que el codigo de entrenamiento funciona sin errores de instalacion.
+  En practica, siempre se usa Colab.
+
+--- scripts/test_model.py ---
+  Uso: python scripts\test_model.py --version v3
+  Que hace: ejecuta 12 preguntas de prueba contra el modelo cargado
+  y solicita al usuario un veredicto manual (correcto/parcial/fallo)
+  para cada respuesta. Genera un reporte en data/test_results.txt.
+  Categorias de preguntas:
+    en_dominio (6): preguntas que el modelo DEBE responder correctamente.
+    off_domain (4): preguntas fuera del dominio universitario que el
+                    modelo DEBE rechazar sin inventar.
+    trampa (2)    : preguntas con datos falsos que el modelo DEBE corregir.
+  Este script genera la evidencia de evaluacion para la tesis (Fase 6).
+  El archivo data/test_set_oficial.json tiene el test set formal con 20
+  preguntas, respuestas esperadas y palabras clave para evaluacion.
+
+--- scripts/chat_cli.py ---
+  Uso: python scripts\chat_cli.py
+  Que hace: inicia una sesion de chat por terminal sin interfaz web.
+  Para que: pruebas rapidas del modelo sin iniciar Django.
+  Util cuando: se descarga un checkpoint nuevo y se quiere verificar
+  rapidamente que responde antes de iniciar el servidor completo.
+
+--- scripts/add_knowledge.py ---
+  (ya descrito arriba)
+
+
+================================================================
+10. ui/ — LAS INTERFACES DE USUARIO
+================================================================
+
+--- ui/django_chatbot/ ---
+  La interfaz web PRINCIPAL de CANUTO.
+  Tecnologia: Django 5.x + Tailwind CSS (via CDN) + JavaScript vanilla.
+  Como iniciar: python ui\django_chatbot\run.py
+  URLs disponibles:
+    http://127.0.0.1:8000/       Widget flotante (garza en esquina)
+    http://127.0.0.1:8000/chat/  Chat pantalla completa estilo ChatGPT
+
+  Estructura interna de ui/django_chatbot/:
+
+  run.py
+    El punto de entrada. Configura el PYTHONPATH para que Django pueda
+    importar desde src/, y lanza el servidor Django en modo --noreload
+    (sin reinicios automaticos, importante para no cargar el modelo dos
+    veces). Soporta --port y --host como argumentos.
+
+  chatbot/settings.py
+    Configuracion de Django: apps instaladas, donde buscar templates,
+    donde servir archivos estaticos. No se toca normalmente.
+
+  chatbot/urls.py
+    Enrutador principal: define que URL llama a que vista.
+    /          → normativa.views.index (widget flotante)
+    /chat/     → normativa.views.chat (chat completo)
+    /api/query/ → normativa.views.api_query (peticion de pregunta)
+    /api/reset/ → normativa.views.api_reset (reiniciar historial)
+
+  normativa/views.py
+    Las vistas (controladores en terminologia Django):
+      index(): renderiza index.html (pagina con widget flotante).
+      chat() : renderiza chat.html pasando preguntas sugeridas y
+               la version del modelo activo.
+      api_query(): recibe POST JSON con "question", llama al pipeline,
+               retorna respuesta JSON. Carga el modelo la primera vez.
+      api_reset(): reinicia el historial de conversacion.
+    Patron clave: _get_pipeline() carga el pipeline una sola vez
+    (lazy loading + singleton) y resuelve el checkpoint_path a ruta
+    absoluta para que funcione independientemente del directorio de
+    trabajo de Django.
+
+  normativa/templates/normativa/
+    base.html  : estructura HTML comun (head, Tailwind CDN, meta).
+    index.html : pagina principal con el widget flotante.
+    chat.html  : chat pantalla completa. Incluye toda la logica JS:
+                 historial de conversaciones en sessionStorage,
+                 mensajes progresivos durante carga del modelo en CPU
+                 (12s, 35s, 75s, 120s),
+                 input deshabilitado mientras espera respuesta,
+                 manejo de errores HTTP y de conexion,
+                 modo oscuro/claro, sidebar con conversaciones,
+                 renombrar/eliminar conversaciones.
+    widget.html: vista previa del widget flotante.
+
+  normativa/static/normativa/
+    garza.png  : icono de la garza morena (mascota de Unillanos).
+
+--- ui/app.py (Gradio) ---
+  Interfaz web alternativa usando Gradio.
+  Como iniciar: python ui\app.py
+  URL: http://127.0.0.1:7860
+  Para que: prototipado rapido y pruebas visuales sin Django.
+  Funciona con el mismo pipeline que Django (src/factory.py).
+  NO es la interfaz que se muestra a usuarios finales ni a la tutora.
+
+
+================================================================
+11. data/ — LOS DATOS DEL PROYECTO
+================================================================
+
+data/dataset/dataset_alpaca.json
+  El dataset de entrenamiento. 423 pares pregunta-respuesta en
+  formato Alpaca (lista de objetos {instruction, input, output}).
+  Este archivo es el insumo directo para el entrenamiento en Colab.
+  Se genera con build_dataset.py y se enriquece con add_knowledge.py.
+  Estructura de cada par:
+    {
+      "instruction": "¿Como funciona el fraccionamiento de matricula?",
+      "input": "",
+      "output": "El fraccionamiento esta reglamentado por la Resolucion
+                 Rectoral No. 074 de 2026..."
+    }
+
+data/test_set_oficial.json
+  Conjunto de evaluacion formal para la Fase 6 de la tesis.
+  20 preguntas con: respuesta esperada verificada en el PDF fuente,
+  nombre del documento fuente, tipo (en_dominio/off_domain/trampa),
+  palabras clave esperadas y palabras prohibidas (para deteccion de
+  alucinaciones automatica).
+  NO se usa para entrenar. Solo para evaluar el modelo resultante.
+
+data/checkpoints/ (IGNORADO POR GIT)
+  Directorio donde viven los modelos entrenados. Cada version ocupa
+  ~2.9 GB. Estructura de un checkpoint:
+    unillanos-v3/
+      config.json                  Arquitectura del modelo.
+      tokenizer.json               Vocabulario y reglas de tokenizacion.
+      tokenizer_config.json        Configuracion del tokenizador.
+      special_tokens_map.json      Tokens especiales (EOS, PAD, etc.).
+      generation_config.json       Parametros de generacion por defecto.
+      model-00001-of-00004.safetensors  Pesos del modelo, parte 1 de 4.
+      model-00002-of-00004.safetensors  Pesos del modelo, parte 2 de 4.
+      ... (hasta 4 shards de ~750 MB cada uno)
+      model.safetensors.index.json Indice de que parametros estan en
+                                   que shard.
+  Por que shards: el modelo completo pesa ~2.9 GB. Se parte en
+  fragmentos de ~750 MB para que la descarga desde Colab sea confiable
+  (menos probabilidad de que falle a mitad).
+
+data/extracted/ (IGNORADO POR GIT)
+  Textos planos extraidos de los PDFs. Un archivo .txt por PDF.
+  Se generan con scripts/extract_text.py.
+  Se ignoran en git porque se pueden regenerar.
+
+data/test_results.txt (IGNORADO POR GIT)
+  Archivo de salida de scripts/test_model.py.
+  Contiene las preguntas, respuestas y veredictos de la ultima
+  evaluacion del modelo.
+
+
+================================================================
+12. PDF/ — LOS DOCUMENTOS FUENTE
+================================================================
+
+Contiene los 34 documentos normativos de Unillanos que forman el
+corpus de conocimiento del modelo.
+
+Tipos de documentos:
+  RESOLUCIONES RECTORALES : actos administrativos del Rector.
+    Ejemplo: Resolucion Rectoral 074/2026 (fraccionamiento matricula).
+  RESOLUCIONES ACADEMICAS  : del Consejo Academico.
+    Ejemplo: Resolucion Academica 043/2026.
+  ACUERDOS                 : del Consejo Superior o Academico.
+    Ejemplo: Acuerdo Academico 003/2023 (segunda lengua Plan BULL).
+  CONVOCATORIAS            : para procesos especificos.
+    Ejemplo: Convocatoria Movilidad Saliente 2026-2.
+  INFORMES DE GESTION      : para contexto institucional.
+  OTROS                    : comunicados, respuestas, manuales.
+
+NOTA: No todos los PDFs son igualmente utiles para el chatbot.
+Los mas importantes son los que definen procedimientos y requisitos
+directos para estudiantes. Los informes de gestion y comunicados
+aportan contexto pero no respuestas directas a preguntas normativas.
+
+Para agregar nuevos documentos:
+  1. Copiar el PDF a esta carpeta.
+  2. Ejecutar: python scripts\extract_text.py
+  3. Ejecutar: python scripts\build_dataset.py --mode heuristic
+  4. Agregar pares curados en scripts/add_knowledge.py si aplica.
+  5. Reentrenar en Colab con el nuevo dataset.
+
+
+================================================================
+13. docs/ — DOCUMENTACION TECNICA
+================================================================
+
+docs/seleccion_modelo_llm.md
+  Justificacion academica de por que se eligio Qwen2.5 como modelo
+  base. Descarta GPT-2 (limitado para espanol y resolucion de preguntas),
+  desmiente la existencia de "GPT-2.5" (no existe), y argumenta la
+  eleccion de Qwen2.5 con criterios de soporte multilingue, parametros,
+  ventana de contexto y viabilidad de fine-tuning en el hardware
+  disponible.
+  Este documento es material directo para el capitulo de marco teorico
+  de la tesis.
+
+docs/sirius/
+  Documentacion del sistema SIRIUS (Sistema de Informacion de la
+  Universidad de los Llanos), al que CANUTO se integrara cuando el
+  acceso este disponible.
+  Contenido:
+    SIRIUS_CLARO.html / SIRIUS_OSCURO.html : capturas de la interfaz de
+      SIRIUS en modo claro y oscuro.
+    MER SIRIUS.pdf : diagrama entidad-relacion de la base de datos de
+      SIRIUS. Util para entender la estructura de datos con la que
+      CANUTO podria integrarse.
+  Por que importa: la API REST de CANUTO (src/api/app.py) esta disenada
+  para ser consumida por el backend de SIRIUS. Django 2.2 / Python 3.5.
+
+
+================================================================
+14. FLUJO COMPLETO DE UNA PREGUNTA HASTA LA RESPUESTA
+================================================================
+
+Ejemplo: usuario escribe "¿Cuanto cuesta la matricula en Unillanos?"
+
+  1. El navegador envia POST a http://127.0.0.1:8000/api/query/
+     con body JSON: {"question": "¿Cuanto cuesta la matricula?"}
+
+  2. Django recibe la peticion en normativa/views.py → api_query().
+
+  3. Se llama _get_pipeline(). Si es la primera peticion:
+     a. load_config("config/config.yaml") lee y combina configuraciones.
+     b. FineTunedModel se instancia con checkpoint_path.
+     c. ChatPipeline se crea con el modelo y el system_prompt.
+     El modelo NO se carga todavia (lazy loading).
+
+  4. pipeline.query("¿Cuanto cuesta la matricula?") se ejecuta.
+
+  5. Dentro de ChatPipeline.query():
+     a. model.is_available() verifica que el checkpoint existe en disco.
+     b. Se construyen los mensajes:
+        [{"role":"system", "content": "<6 reglas de CANUTO>"},
+         {"role":"user",   "content": "¿Cuanto cuesta la matricula?"}]
+     c. Se llama model.chat(messages).
+
+  6. Dentro de FineTunedModel.chat():
+     a. _load() carga el modelo en RAM (solo primera vez, ~2 min en CPU).
+     b. apply_chat_template() convierte los mensajes al formato:
+        <|im_start|>system\n<reglas>\n<|im_end|>
+        <|im_start|>user\n¿Cuanto...?\n<|im_end|>
+        <|im_start|>assistant\n
+     c. El tokenizador convierte el texto a tokens numericos.
+     d. model.generate() produce los tokens de la respuesta.
+        Con temperature=0.3 y top_p=0.85, el modelo es conservador:
+        prefiere tokens probables sobre inventar.
+     e. El tokenizador decodifica los tokens a texto.
+     f. Retorna: "El valor de la matricula en Unillanos no tiene un
+        precio fijo. Se calcula de forma personalizada..."
+
+  7. ChatPipeline guarda el par en el historial (max 5 turnos).
+
+  8. views.api_query() recibe la respuesta y retorna:
+     JsonResponse({"answer": "El valor de la matricula..."})
+
+  9. El JavaScript en chat.html recibe el JSON, elimina el indicador
+     de escritura (tres puntos animados), y agrega la burbuja de
+     respuesta al chat.
+
+  10. El usuario ve la respuesta en pantalla.
+
+
+================================================================
+15. COMO AGREGAR NUEVOS DOCUMENTOS AL CONOCIMIENTO DEL MODELO
+================================================================
+
+Cuando se reciban nuevos documentos de Unillanos (via SIRIUS u otros):
+
+  1. Copiar los PDFs a la carpeta PDF/.
+
+  2. Regenerar el texto extraido:
+       python scripts\extract_text.py
+     Esto crea nuevos .txt en data/extracted/ para los PDFs nuevos.
+
+  3. Regenerar el dataset base:
+       python scripts\build_dataset.py --mode heuristic
+     ATENCION: esto sobreescribe dataset_alpaca.json.
+
+  4. Volver a agregar los pares curados:
+       python scripts\add_knowledge.py
+     Los pares de add_knowledge.py se agregan de nuevo (check de duplicados).
+
+  5. Revisar el dataset resultante:
+     Abrir data/dataset/dataset_alpaca.json y verificar que los nuevos
+     pares generados tienen sentido. Corregir o eliminar los malos.
+     Agregar pares especificos del nuevo documento en add_knowledge.py.
+
+  6. Reentrenar en Colab:
+     Subir dataset_alpaca.json a Google Colab y ejecutar
+     scripts/colab_train_v3.ipynb.
+
+  7. Descargar el checkpoint nuevo y actualizar config.yaml.
+
+
+================================================================
+16. COMO REENTRENAR EL MODELO
+================================================================
+
+Cuando reentrenar:
+  - Se agregaron nuevos PDFs.
+  - Se amplio o corrigio el dataset.
+  - La evaluacion mostro alucinaciones sistematicas.
+  - Se cambia de modelo base (ej: de 1.5B a 7B en workstation).
+
+Pasos:
+  1. Tener el dataset actualizado (ver seccion 15).
+  2. Abrir https://colab.research.google.com
+  3. Subir scripts/colab_train_v3.ipynb (File → Upload Notebook).
+  4. Cambiar a GPU T4: Runtime → Change runtime type → T4 GPU.
+  5. Ejecutar Celda 1 (instala peft y trl, ~1 min).
+  6. Ejecutar Celda 2 (sube dataset_alpaca.json del laptop).
+  7. Ejecutar Celda 3 (entrenamiento, ~25-35 min). No cerrar el navegador.
+  8. Ejecutar Celda 4 (prueba 4 preguntas criticas antes de descargar).
+     Si las respuestas son malas, no descargar. Revisar el dataset.
+  9. Ejecutar Celda 5 (descarga los archivos del checkpoint).
+     Acepta cada descarga en el dialogo del navegador antes de Enter.
+ 10. Mover todos los archivos descargados a:
+       CANUTO\data\checkpoints\unillanos-v4\  (incrementar version)
+ 11. Editar config/config.yaml:
+       checkpoint_path: "data/checkpoints/unillanos-v4"
+ 12. Reiniciar el servidor y probar con:
+       python scripts\test_model.py --version v4
+
+Historial de versiones:
+  unillanos-v1 : 20 PDFs, 228 pares, rank=8 — primera prueba (alucinaciones graves)
+  unillanos-v2 : 34 PDFs, 387 pares, rank=8 — mejoras parciales
+  unillanos-v3 : 34 PDFs, 423 pares, rank=16, 4 epocas — en entrenamiento (2026-06-09)
+  unillanos-v4 : (futuro) nuevos documentos SIRIUS, 7B en workstation
+
+
+================================================================
+17. ERRORES COMUNES Y COMO INTERPRETARLOS
+================================================================
+
+ERROR: "El modelo aún no está disponible"
+  Causa: checkpoint_path en config.yaml no existe o esta vacio.
+  Solucion: verificar que la carpeta data/checkpoints/unillanos-vX/
+  existe y tiene los archivos .safetensors. Verificar config.yaml.
+
+ERROR: ModuleNotFoundError: No module named 'django'
+  Causa: el entorno virtual no esta activo.
+  Solucion: ejecutar primero: venv\Scripts\activate
+
+ERROR: OSError: [Errno 98] Address already in use
+  Causa: el puerto 8000 ya esta ocupado (otra instancia del servidor).
+  Solucion: usar otro puerto: python ui\django_chatbot\run.py --port 8080
+  O matar el proceso: Get-Process python | Stop-Process (PowerShell)
+
+ERROR durante extraccion de PDF: "Could not extract text"
+  Causa: el PDF es un escaneo y EasyOCR no esta instalado correctamente.
+  Solucion: verificar que easyocr y pymupdf estan en el venv.
+  El script marcara el PDF como "escaneado" y usara OCR automaticamente.
+
+ERROR durante entrenamiento en Colab: "CUDA out of memory"
+  Causa: el batch_size es muy grande para la GPU T4 con SEQ_LEN=1024.
+  Solucion: reducir BATCH de 2 a 1 en la Celda 3 del notebook.
+
+El modelo ALUCINA (inventa informacion):
+  Causa probable: el par QA sobre ese tema no esta en el dataset, o
+  el par existente es incorrecto.
+  Solucion: agregar pares curados en scripts/add_knowledge.py que
+  cubran ese caso especifico y reentrenar.
+
+El modelo dice "No tengo informacion" para preguntas que DEBERIA saber:
+  Causa: el par QA para esa pregunta no esta en el dataset, o el
+  modelo aprendio que casi todo esta fuera de su dominio.
+  Solucion: revisar el balance entre pares "con conocimiento" y pares
+  "no tengo informacion" en el dataset. No deben ser mas del 10-15%.
+
+================================================================
+  Ultima actualizacion: 2026-06-09
+  Para preguntas sobre el proyecto: cristian.abello@unillanos.edu.co
+================================================================
