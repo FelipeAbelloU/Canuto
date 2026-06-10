@@ -13,7 +13,7 @@ model:
   # Dejar vacío hasta que el entrenamiento esté completo.
   # Ejemplo: "models/checkpoint-500"  o ruta absoluta al directorio
   ######### MODIFICAR EL CHECKPOINT SEGUN SEA NECESARIA DE LA VERSION DE ENTRENAMIENTO ########
-  checkpoint_path: "data/checkpoints/unillanos-v2"
+  checkpoint_path: "data/checkpoints/unillanos-v3"
   device: cpu          # cpu | cuda
   max_new_tokens: 512
   temperature: 0.3

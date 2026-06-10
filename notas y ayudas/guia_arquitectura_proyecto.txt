@@ -1,6 +1,5 @@
 ================================================================
   CANUTO — Guia de Arquitectura y Desarrollo
-  Para programadores que se integran al proyecto desde cero
 ================================================================
   Proyecto : Chatbot Asistente Normativo Universidad de los Llanos
   Autor    : Cristian Felipe Abello Gamba
