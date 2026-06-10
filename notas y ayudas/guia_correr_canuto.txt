@@ -53,7 +53,8 @@ Guardar el archivo y REINICIAR el servidor (Ctrl+C y volver a ejecutar).
 VERSIONES DISPONIBLES en data/checkpoints/:
   unillanos-v1 : 20 PDFs, 228 pares QA — primera prueba (alucinaciones graves)
   unillanos-v2 : 34 PDFs, 387 pares QA — mejoras parciales
-  unillanos-v3 : 34 PDFs, 423 pares QA, rank=16, 4 epocas — ACTUAL (en entrenamiento)
+  unillanos-v3 : 34 PDFs, 423 pares QA, rank=16, 4 epocas — descargado, activo
+  unillanos-v4 : 34 PDFs, 468 pares QA, rank=16, 4 epocas — PENDIENTE ENTRENAR EN COLAB
 
 Nota: los checkpoints NO estan en git (son muy grandes). Si cambiaste de
 maquina o no tienes el checkpoint, hay que descargarlo de Colab.
@@ -305,15 +306,17 @@ ARCHIVOS QUE DEBE TENER EL CHECKPOINT:
 CANUTO/
   config/config.yaml         <- configuracion principal (editar checkpoint_path aqui)
   data/checkpoints/          <- modelos entrenados (NO en git, ~3 GB cada uno)
-  data/dataset/              <- dataset de entrenamiento (423 pares QA)
+  data/dataset/              <- dataset de entrenamiento (468 pares QA)
   data/test_set_oficial.json <- test set formal para la tesis (20 preguntas)
   PDF/                       <- documentos PDF fuente (34 PDFs)
   scripts/                   <- herramientas de extraccion, entrenamiento y pruebas
   src/                       <- nucleo del sistema (logica Python)
   ui/django_chatbot/         <- interfaz web CANUTO (Django)
   notas y ayudas/            <- esta carpeta (guias, referencia)
-    guia_correr_canuto.txt   <- ESTE ARCHIVO (uso diario)
-    guia_arquitectura_proyecto.txt  <- explicacion tecnica completa
+    guia_correr_canuto.txt              <- ESTE ARCHIVO (uso diario)
+    guia_arquitectura_proyecto.txt     <- explicacion tecnica completa
+    colab_train_v4.ipynb               <- notebook activo para entrenar v4
+    colab_train_v3.ipynb               <- version anterior (referencia)
 
 ================================================================
   FIN DEL DOCUMENTO
