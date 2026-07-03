@@ -1,43 +1,23 @@
-# =============================================================
-# CANUTO — Asistente Normativo Unillanos — Dependencias
-# =============================================================
-# Entorno de referencia:
-#   - Python 3.11.9
+# CANUTO — dependencias (Python 3.11+)
 #
-# Instalación:
+# torch va aparte (el wheel depende del hardware); instalar ANTES:
+#   CPU:  pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu
+#   CUDA: pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cu121
+# luego: pip install -r requirements.txt
 #
-# 1. Activar entorno virtual:
-#    venv\Scripts\activate
-#
-# 2. Instalar PyTorch según hardware (NO viene en este archivo, ver nota *):
-#    CPU (laptop):       pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu
-#    CUDA (workstation): pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cu121
-#
-# 3. Instalar el resto:
-#    pip install -r requirements.txt
-#
-# * torch se instala por separado porque wheel depende del hardware
-#   torch==2.12.0.
-# =============================================================
+# El OCR de escaneados usa docling en un venv APARTE (requirements-docling.txt),
+# porque exige transformers moderno que rompe el stack de inferencia/entrenamiento.
 
-# --- Extracción de PDFs digitales → Markdown ---
-pymupdf4llm==1.28.0      # extractor digital elegido (ver docs/comparacion_extraccion_md.md)
-pdfplumber==0.11.9       # fallback / detección de tipo
-pypdf==6.12.2            # fallback secundario
-
-PyMuPDF==1.28.0          # requerido por pymupdf4llm
-
-# --- OCR para PDFs escaneados ---
-# El OCR usa docling y NO se instala aquí: exige transformers moderno que rompe el
-# stack de inferencia/entrenamiento → va en un venv APARTE en la workstation con GPU.
-# Ver requirements-docling.txt y docs/comparacion_extraccion_md.md.
+# --- Extracción PDF -> Markdown ---
+pymupdf4llm==1.28.0
+pdfplumber==0.11.9
+PyMuPDF==1.28.0
 
 # --- Configuración ---
 PyYAML==6.0.3
 python-dotenv==1.2.2
 
 # --- Modelo de lenguaje (HuggingFace) ---
-# torch se instala por separado (ver nota arriba). Versión validada: 2.12.0
 transformers==4.46.3
 tokenizers==0.20.3
 safetensors==0.7.0
