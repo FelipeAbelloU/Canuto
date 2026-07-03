@@ -9,12 +9,27 @@
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    // Paleta "Coral cálido" — rojo suavizado para mayor comodidad visual.
+    // Se redefine la escala `red` de Tailwind, así todos los `red-*` de los
+    // templates heredan el tono suave sin tocar cada archivo.
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            primary: { DEFAULT: '#C8102E', hover: '#A50D25' }
+            primary: { DEFAULT: '#CF5151', hover: '#B83F3F' },
+            red: {
+              50:  '#FDF3F3',
+              100: '#FBE4E4',
+              200: '#F7CACA',
+              300: '#F0A5A5',
+              400: '#E8807F',
+              500: '#DD6363',
+              600: '#CF5151',  // principal
+              700: '#B83F3F',  // hover
+              800: '#993333',
+              900: '#7A2A2A',
+            }
           }
         }
       }

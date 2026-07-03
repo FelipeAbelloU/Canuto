@@ -1,51 +1,63 @@
 # =============================================================
-# Asistente Normativo Unillanos — Dependencias
+# CANUTO — Asistente Normativo Unillanos — Dependencias
 # =============================================================
+# Entorno de referencia:
+#   - Python 3.11.9
+#
 # Instalación:
 #
 # 1. Activar entorno virtual:
 #    venv\Scripts\activate
 #
-# 2. Instalar PyTorch según hardware:
-#    CPU (laptop):       pip install torch --index-url https://download.pytorch.org/whl/cpu
-#    CUDA (workstation): pip install torch --index-url https://download.pytorch.org/whl/cu121
+# 2. Instalar PyTorch según hardware (NO viene en este archivo, ver nota *):
+#    CPU (laptop):       pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu
+#    CUDA (workstation): pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cu121
 #
 # 3. Instalar el resto:
 #    pip install -r requirements.txt
+#
+# * torch se instala por separado porque wheel depende del hardware
+#   torch==2.12.0.
 # =============================================================
 
-# --- Extracción de PDFs digitales ---
-pdfplumber>=0.11.0
-pypdf>=4.0.0
+# --- Extracción de PDFs digitales → Markdown ---
+pymupdf4llm==1.28.0      # extractor digital elegido (ver docs/comparacion_extraccion_md.md)
+pdfplumber==0.11.9       # fallback / detección de tipo
+pypdf==6.12.2            # fallback secundario
+
+PyMuPDF==1.28.0          # requerido por pymupdf4llm
 
 # --- OCR para PDFs escaneados ---
-pymupdf>=1.24.0          # convierte páginas PDF a imágenes para OCR
-Pillow>=10.0.0           # manipulación de imágenes
-easyocr>=1.7.0           # OCR principal (español + inglés, no requiere instalación del sistema)
-# pytesseract>=0.3.10    # alternativa: requiere Tesseract instalado en el sistema
+# El OCR usa docling y NO se instala aquí: exige transformers moderno que rompe el
+# stack de inferencia/entrenamiento → va en un venv APARTE en la workstation con GPU.
+# Ver requirements-docling.txt y docs/comparacion_extraccion_md.md.
 
 # --- Configuración ---
-pyyaml>=6.0.1
-python-dotenv>=1.0.1
+PyYAML==6.0.3
+python-dotenv==1.2.2
 
 # --- Modelo de lenguaje (HuggingFace) ---
-# torch se instala por separado (ver arriba)
-transformers>=4.45.0
-accelerate>=0.26.0
-huggingface_hub>=0.25.0
+# torch se instala por separado (ver nota arriba). Versión validada: 2.12.0
+transformers==4.46.3
+tokenizers==0.20.3
+safetensors==0.7.0
+accelerate==1.13.0
+huggingface_hub==0.36.2
+numpy==2.4.6
 
 # --- Fine-tuning con LoRA (solo necesario para scripts/train.py) ---
-peft>=0.13.0
-trl>=0.12.0,<0.13.0
-datasets>=2.20.0
+peft==0.19.1
+trl==0.12.2
+datasets==4.8.5
 
 # --- Interfaz web Django (CANUTO) ---
-django>=4.2.0
+Django==5.2.15
 
 # --- Interfaz web alternativa (Gradio, opcional) ---
-gradio>=4.44.0
+gradio==6.15.2
 
 # --- API REST (integración con SIRIUS) ---
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-pydantic>=2.0.0
+fastapi==0.136.3
+starlette==1.2.0
+uvicorn[standard]==0.48.0
+pydantic==2.13.4

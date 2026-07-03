@@ -13,21 +13,21 @@ model:
   # Dejar vacío hasta que el entrenamiento esté completo.
   # Ejemplo: "models/checkpoint-500"  o ruta absoluta al directorio
   ######### MODIFICAR EL CHECKPOINT SEGUN SEA NECESARIA DE LA VERSION DE ENTRENAMIENTO ########
-  checkpoint_path: "data/checkpoints/unillanos-v3"
+  checkpoint_path: "data/checkpoints/unillanos-v4" # ===============================================================
   device: cpu          # cpu | cuda
   max_new_tokens: 512
   temperature: 0.3
   top_p: 0.85
 
-# --- Extracción de texto desde PDFs ---
+# --- Extracción de PDFs a Markdown (.md) ---
+# Digitales: pymupdf4llm. Escaneados/corruptos: OCR docling (venv aparte, con --ocr).
 extraction:
   pdf_dir: "PDF"               # directorio con los PDFs fuente
-  output_dir: "data/extracted" # dónde guardar los .txt extraídos
-  ocr_engine: "easyocr"        # easyocr | tesseract
+  output_dir: "data/extracted" # dónde guardar los .md extraídos
 
 # --- Generación del dataset de fine-tuning ---
 dataset:
-  input_dir: "data/extracted"  # textos .txt de entrada
+  input_dir: "data/extracted"  # documentos .md de entrada
   output_dir: "data/dataset"   # dataset JSON de salida
   format: "alpaca"             # alpaca | sharegpt
 

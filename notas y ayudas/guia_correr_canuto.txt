@@ -62,10 +62,10 @@ Ver seccion 6 y 7.
 
 
 ================================================================
-3. DEMOSTRACION PARA LA TUTORA
+3. DEMOSTRACION
 ================================================================
 
-ANTES de llegar a la reunion:
+ANTES de:
   a) Verificar que el checkpoint este en data/checkpoints/unillanos-v3/
   b) Abrir config\config.yaml y confirmar:
        checkpoint_path: "data/checkpoints/unillanos-v3"
@@ -73,7 +73,7 @@ ANTES de llegar a la reunion:
   d) La primera pregunta tardara ~2 min. Hacerla ANTES de la reunion
      para que el modelo quede cargado en RAM.
 
-DURANTE la reunion (paso a paso sin ayuda):
+DURANTE (paso a paso sin ayuda):
 
   Paso 1 - Abrir VS Code en la carpeta CANUTO
   Paso 2 - Abrir terminal: Ctrl + ñ
@@ -164,9 +164,9 @@ SOLUCION: El servidor debe lanzarse con --noreload (ya esta configurado
 
 (Todos desde la raiz de CANUTO con el venv activo)
 
-EXTRACCION DE TEXTO DE PDFS:
+EXTRACCION DE PDFS A MARKDOWN:
   python scripts\extract_text.py
-  → Genera data/extracted/*.txt a partir de PDF/
+  → Genera data/extracted/**/*.md a partir de PDF/ (escaneados → data/_ocr_queue.txt)
 
 GENERAR DATASET DE ENTRENAMIENTO:
   python scripts\build_dataset.py --mode heuristic

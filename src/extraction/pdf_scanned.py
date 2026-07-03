@@ -1,6 +1,12 @@
-"""Extrae texto de PDFs escaneados (imágenes) usando OCR.
-Soporta EasyOCR (recomendado) y Tesseract como alternativa.
-Requiere pymupdf para convertir páginas PDF a imágenes.
+"""Extrae texto de PDFs escaneados (imágenes) usando OCR con docling.
+
+docling hace el OCR y además reconoce tablas, y entrega el resultado ya en Markdown.
+Necesita GPU para ser práctico a gran escala y un ENTORNO VIRTUAL APARTE, porque sus
+dependencias chocan con las del stack de entrenamiento/inferencia. Ver
+``requirements-docling.txt`` y ``docs/comparacion_extraccion_md.md``.
+
+El import de docling es diferido: importar este módulo no falla en la laptop sin
+docling; solo falla si se llama a ``extract()`` sin docling instalado.
 """
 from __future__ import annotations
 
@@ -8,77 +14,39 @@ from pathlib import Path
 from .pdf_digital import ExtractedDocument
 
 
-def _pdf_to_images(path: Path) -> list:
-    """Convierte cada página del PDF en una imagen PIL usando pymupdf."""
+def _count_pages(path: Path) -> int:
+    # Cuenta las páginas del PDF (solo para el reporte; no afecta al OCR).
     try:
-        import fitz  # pymupdf
-    except ImportError:
-        raise ImportError(
-            "pymupdf no instalado. Ejecuta: pip install pymupdf Pillow"
-        )
-    import PIL.Image
-    import io
-
-    doc = fitz.open(str(path))
-    images = []
-    for page in doc:
-        pix = page.get_pixmap(dpi=200)
-        img = PIL.Image.open(io.BytesIO(pix.tobytes("png")))
-        images.append(img)
-    return images
+        import pymupdf
+        with pymupdf.open(str(path)) as doc:
+            return doc.page_count
+    except Exception:
+        return 0
 
 
-def _ocr_easyocr(images: list) -> str:
-    try:
-        import easyocr
-        import numpy as np
-    except ImportError:
-        raise ImportError("easyocr no instalado. Ejecuta: pip install easyocr")
-
-    reader = easyocr.Reader(["es", "en"], gpu=False, verbose=False)
-    pages_text = []
-    for img in images:
-        result = reader.readtext(np.array(img), detail=0, paragraph=True)
-        pages_text.append(" ".join(result))
-    return "\n\n".join(pages_text)
-
-
-def _ocr_tesseract(images: list) -> str:
-    try:
-        import pytesseract
-    except ImportError:
-        raise ImportError(
-            "pytesseract no instalado. Ejecuta: pip install pytesseract\n"
-            "Además necesitas Tesseract instalado en el sistema: https://github.com/UB-Mannheim/tesseract/wiki"
-        )
-    pages_text = []
-    for img in images:
-        text = pytesseract.image_to_string(img, lang="spa")
-        pages_text.append(text)
-    return "\n\n".join(pages_text)
-
-
-def extract(pdf_path: str | Path, engine: str = "easyocr") -> ExtractedDocument:
-    """Extrae texto de un PDF escaneado usando OCR.
-
-    Args:
-        pdf_path: ruta al PDF escaneado
-        engine: "easyocr" (por defecto) o "tesseract"
-    """
+def extract(pdf_path: str | Path) -> ExtractedDocument:
+    """Convierte un PDF escaneado a Markdown usando el OCR de docling."""
     path = Path(pdf_path)
-    images = _pdf_to_images(path)
 
-    if engine == "tesseract":
-        text = _ocr_tesseract(images)
-        method = "tesseract"
-    else:
-        text = _ocr_easyocr(images)
-        method = "easyocr"
+    # Import diferido: docling solo se necesita en la máquina que corre el OCR.
+    try:
+        from docling.document_converter import DocumentConverter
+    except ImportError:
+        raise ImportError(
+            "docling no está instalado. Va en un venv APARTE (ver requirements-docling.txt).\n"
+            "  python -m venv venv-docling && venv-docling\\Scripts\\activate\n"
+            "  pip install -r requirements-docling.txt"
+        )
+
+    # docling hace el OCR y devuelve el documento ya convertido a Markdown.
+    converter = DocumentConverter()
+    result = converter.convert(str(path))
+    text = result.document.export_to_markdown()
 
     return ExtractedDocument(
         filename=path.name,
         filepath=str(path.resolve()),
         text=text,
-        pages=len(images),
-        method=method,
+        pages=_count_pages(path),
+        method="docling",
     )

@@ -1,0 +1,11 @@
+# Paso 0 — venv aparte CON GPU
+python -m venv venv-docling
+venv-docling\Scripts\activate
+pip install torch --index-url https://download.pytorch.org/whl/cu121   # CUDA primero
+pip install -r requirements-docling.txt
+
+# Paso 1 — smoke test docling en 5–10 escaneados variados y REVISAR calidad
+python scripts\extract_text.py --ocr --years 2015 --limit 10
+
+# Paso 2 — si la calidad es buena, corrida completa del OCR
+python scripts\extract_text.py --ocr
