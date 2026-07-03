@@ -186,12 +186,10 @@ GRADIO
   alternativa de desarrollo rapido.
   Donde se usa: ui/app.py
 
-PDFPLUMBER + PYPDF
-  Que son: librerias para extraer texto de PDFs con capa de texto
-  digital (PDFs donde el texto es seleccionable con el cursor).
-  Por que dos librerias: pdfplumber maneja mejor tablas y layouts
-  complejos; pypdf es mas rapido para texto simple. El script de
-  extraccion intenta pdfplumber primero y pypdf como respaldo.
+PYMUPDF4LLM + PDFPLUMBER
+  Que son: librerias para extraer texto de PDFs digitales (texto
+  seleccionable). pymupdf4llm entrega Markdown con estructura y tablas.
+  Estrategia: pymupdf4llm primero (mejor calidad); si falla, pdfplumber.
   Donde se usan: src/extraction/pdf_digital.py
 
 DOCLING (OCR)
@@ -494,9 +492,9 @@ Estructura:
   como max_history: 5).
 
 --- src/extraction/pdf_digital.py ---
-  Que hace: extrae texto de PDFs con texto seleccionable.
-  Estrategia: intenta pdfplumber primero (mejor para tablas y columnas),
-  si falla o da muy poco texto usa pypdf como respaldo.
+  Que hace: extrae texto de PDFs con texto seleccionable, en Markdown.
+  Estrategia: pymupdf4llm primero; si falla, pdfplumber. Ademas marca la
+  capa de texto corrupta para desviarla a OCR.
   Cuando se usa: durante el pipeline offline, al correr extract_text.py.
   NO se usa en runtime (el modelo ya aprendio el contenido).
 

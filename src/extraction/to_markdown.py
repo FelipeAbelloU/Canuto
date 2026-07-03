@@ -1,19 +1,9 @@
-"""Convierte el texto plano extraído de un PDF normativo a Markdown estructurado.
+"""Arma el .md estructurado a partir del texto extraído.
 
-Dos fuentes de estructura se combinan:
-
-1. **Metadata de la ruta**: el corpus sigue la estructura de SIRIUS
-   ``PDF/<año>/si/normatividad/<TIPO>/<numero>_<año>.pdf``. De ahí se derivan,
-   sin adivinar nada, el tipo de documento, el año y el número. Esa metadata se
-   escribe como frontmatter YAML al inicio del .md.
-
-2. **Estructura interna del documento**: las resoluciones, acuerdos y actas de
-   Unillanos tienen una estructura legal muy regular (CONSIDERANDO, RESUELVE,
-   ARTÍCULO N, PARÁGRAFO). Se detecta con expresiones regulares afinadas a este
-   corpus en español y se promueve a encabezados Markdown (##, ###, ####).
-
-El resultado es un .md jerárquico que las etapas siguientes (qa_builder) pueden
-recorrer por encabezados en lugar de adivinar dónde empieza cada artículo.
+Combina dos fuentes: la metadata de la ruta SIRIUS (tipo/año/número -> frontmatter
+YAML) y la estructura legal del cuerpo (CONSIDERANDO/RESUELVE/ARTÍCULO/PARÁGRAFO),
+que se detecta con regex y se promueve a encabezados (##, ###, ####) para que
+qa_builder pueda recorrerlo por secciones.
 """
 from __future__ import annotations
 

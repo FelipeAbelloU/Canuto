@@ -1,30 +1,13 @@
-"""Extrae texto de los PDFs normativos y los guarda como Markdown (.md) estructurado.
+"""PDF -> Markdown (.md) estructurado, espejando la ruta del corpus SIRIUS.
 
-El corpus sigue la estructura de SIRIUS:
-    PDF/<año>/si/normatividad/<TIPO>/<numero>_<año>.pdf
+Salida: data/extracted/<año>/<TIPO>/<n>_<año>.md, con frontmatter YAML y la
+estructura legal en encabezados (CONSIDERANDO/RESUELVE ##, ARTÍCULO ###, PARÁGRAFO ####).
 
-La salida espeja esa estructura en data/extracted, en formato Markdown:
-    data/extracted/<año>/<TIPO>/<numero>_<año>.md
+    python scripts/extract_text.py                        # solo digitales (escaneados -> cola OCR)
+    python scripts/extract_text.py --ocr                  # + OCR docling (workstation con GPU)
+    python scripts/extract_text.py --types RESOLUCION_SUPERIOR --years 2024,2025 --limit 10
 
-Cada .md lleva frontmatter YAML con metadata (tipo, año, número, fuente) derivada
-de la ruta, y el cuerpo con la estructura legal promovida a encabezados Markdown
-(CONSIDERANDO/RESUELVE -> ##, ARTÍCULO -> ###, PARÁGRAFO -> ####).
-
-Uso:
-    # Solo PDFs digitales (rápido). Los escaneados se cuentan pero se omiten:
-    python scripts/extract_text.py
-
-    # Filtrar por tipo y/o año (para entrenar por subconjuntos):
-    python scripts/extract_text.py --types RESOLUCION_ACADEMICA,RESOLUCION_SUPERIOR
-    python scripts/extract_text.py --years 2024,2025,2026
-
-    # Probar con pocos documentos:
-    python scripts/extract_text.py --limit 10
-
-    # Incluir OCR para escaneados (LENTO en CPU; usar en GPU/workstation):
-    python scripts/extract_text.py --ocr
-
-Los archivos ya procesados se omiten (borrar el .md para reprocesar).
+Los .md ya generados se omiten (borrar el .md para reprocesar).
 """
 import sys
 import argparse

@@ -102,7 +102,7 @@ plano que `qa_builder` no puede navegar por encabezados.
 
 El rewire de la extracción digital está implementado y validado:
 
-- **`src/extraction/pdf_digital.py`**: extractor = pymupdf4llm (fallback pdfplumber→pypdf).
+- **`src/extraction/pdf_digital.py`**: extractor = pymupdf4llm (fallback pdfplumber).
   Nuevo detector `looks_corrupt()` de capa de texto corrupta (fuente rota, sistemática).
 - **`src/extraction/to_markdown.py`**: normalizador nuevo `_normalize_markdown()` que
   - preserva tablas verbatim,

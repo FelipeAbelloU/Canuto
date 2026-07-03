@@ -1,44 +1,20 @@
-# =============================================================
-# CANUTO — Extracción OCR de escaneados con docling
-# =============================================================
-# ENTORNO SEPARADO — NO instalar en el venv principal.
+# CANUTO — OCR de escaneados con docling — ENTORNO SEPARADO (no mezclar con el venv principal)
 #
-# docling exige transformers moderno (≥4.49) que ROMPE el stack de
-# inferencia/entrenamiento del venv principal (transformers 4.46.3 + trl).
-# Por eso vive en su propio entorno virtual, usado solo para convertir los
-# PDFs escaneados/corruptos a Markdown (ver docs/comparacion_extraccion_md.md).
+# docling exige transformers moderno que rompe el stack de inferencia/entrenamiento,
+# por eso vive en su propio venv. Se usa solo para OCR-izar los PDFs escaneados.
 #
-# Uso en la workstation (con GPU):
-#   python -m venv venv-docling
-#   venv-docling\Scripts\activate            (Windows)
-#   source venv-docling/bin/activate         (Linux)
-#   pip install -r requirements-docling.txt
-#   # luego, desde el venv-docling:
-#   python scripts/extract_text.py --ocr --ocr-engine docling
-#
-# Nota GPU: para acelerar en la RTX 4090, instalar torch con CUDA ANTES:
+# En la workstation con GPU (instalar torch CUDA ANTES que docling):
+#   python -m venv venv-docling && source venv-docling/bin/activate   # Linux
 #   pip install torch --index-url https://download.pytorch.org/whl/cu121
-# =============================================================
+#   pip install -r requirements-docling.txt
+#
+# Flujo de dos pasos (MISMO --output-dir):
+#   1) venv principal:  python scripts/extract_text.py         (digitales)
+#   2) venv-docling:    python scripts/extract_text.py --ocr   (escaneados; salta los ya hechos)
 
 docling==2.107.0
 
-# docling resuelve por su cuenta sus dependencias pesadas (transformers moderno,
-# docling-ibm-models, rapidocr/onnxruntime, opencv, etc.). No fijar transformers
-# aquí: dejar que docling elija la versión que necesita su modelo de layout.
-
-# --- Necesarias por el orquestador scripts/extract_text.py ---
-# Clasifica cada PDF (is_likely_digital→pdfplumber) y cuenta páginas (_count_pages→pymupdf)
-# ANTES de llamar a docling. Sin estas, el comando --ocr falla con ModuleNotFoundError.
+# El orquestador clasifica cada PDF (pdfplumber) y cuenta páginas (pymupdf) antes de docling:
 pdfplumber==0.11.9
-pypdf==6.12.2
 PyMuPDF==1.28.0
-
-# Frontmatter YAML del .md:
 PyYAML==6.0.3
-
-# =============================================================
-# Flujo recomendado en la workstation (dos pasos, MISMO --output-dir):
-#   1) venv principal:  python scripts/extract_text.py            (digitales → .md)
-#   2) venv-docling:    python scripts/extract_text.py --ocr      (escaneados/corruptos → OCR)
-# El paso 2 salta los .md ya generados; solo procesa la cola de OCR.
-# =============================================================
