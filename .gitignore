@@ -1,12 +1,20 @@
 # Entorno virtual
 venv/
 .venv/
+# entorno aparte para el OCR docling (workstation)
+venv-docling/
 
 # Checkpoints del modelo (3 GB — demasiado grandes para GitHub)
 data/checkpoints/
 
+# Corpus PDF de SIRIUS (~5 GB — se transfiere aparte por USB/disco, no por git)
+PDF/
+
 # Textos extraídos (se regeneran con scripts/extract_text.py)
 data/extracted/
+
+# Cola de OCR para la workstation (se regenera al correr extract_text.py)
+data/_ocr_queue.txt
 
 # Cache de Python
 __pycache__/

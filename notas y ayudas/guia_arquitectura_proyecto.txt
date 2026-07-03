@@ -194,13 +194,15 @@ PDFPLUMBER + PYPDF
   extraccion intenta pdfplumber primero y pypdf como respaldo.
   Donde se usan: src/extraction/pdf_digital.py
 
-EASYOCR + PYMUPDF
-  Que son: motor de OCR (reconocimiento optico de caracteres) para
-  extraer texto de PDFs escaneados (imagenes de documentos fisicos).
+DOCLING (OCR)
+  Que es: motor de OCR (reconocimiento optico de caracteres) que ademas
+  reconoce tablas y devuelve el resultado en Markdown.
   Por que: algunos documentos normativos de Unillanos son escaneos de
-  papel. Sin OCR, solo se obtiene una imagen; EasyOCR convierte
-  esa imagen en texto.
-  Donde se usan: src/extraction/pdf_scanned.py
+  papel. Sin OCR, solo se obtiene una imagen; docling convierte esa
+  imagen en texto estructurado.
+  Donde se usa: src/extraction/pdf_scanned.py
+  Nota: docling va en un VENV APARTE (requirements-docling.txt) y se corre
+  en la workstation con GPU. Ver docs/comparacion_extraccion_md.md.
 
 YAML (pyyaml)
   Que es: formato de configuracion legible por humanos.
@@ -226,7 +228,7 @@ PARTE 1 — PIPELINE OFFLINE (preparacion de datos y entrenamiento)
   Se ejecuta UNA VEZ cada vez que se quiere mejorar el modelo.
   No esta activo cuando el chatbot esta en uso.
 
-  [PDFs] → extract_text.py → [textos .txt]
+  [PDFs] → extract_text.py → [Markdown .md]
          → build_dataset.py → [dataset JSON]
          → add_knowledge.py → [dataset enriquecido]
          → colab_train_v3.ipynb (en Google Colab) → [checkpoint]
@@ -264,14 +266,17 @@ MODO OFFLINE (construccion del conocimiento)
   Duracion: extraccion ~5 min, generacion dataset ~2 min,
             entrenamiento ~25-35 min en Colab.
 
-  Paso 1 — Extraccion de texto:
+  Paso 1 — Extraccion a Markdown:
     python scripts\extract_text.py
-    Lee los PDFs de PDF/, extrae el texto y lo guarda en data/extracted/
-    como archivos .txt, uno por documento.
+    Lee los PDFs de PDF/, extrae el texto (pymupdf4llm los digitales; docling
+    OCR los escaneados, en venv aparte) y lo guarda en data/extracted/ como
+    archivos .md con frontmatter YAML y estructura legal, uno por documento.
+    Los escaneados/corruptos se envian a data/_ocr_queue.txt para procesar con
+    docling en la workstation (GPU): python scripts\extract_text.py --ocr
 
   Paso 2 — Generacion del dataset:
     python scripts\build_dataset.py --mode heuristic
-    Lee los .txt de data/extracted/ y genera pares pregunta-respuesta
+    Lee los .md de data/extracted/ y genera pares pregunta-respuesta
     automaticamente usando heuristicas (busca titulos, articulos,
     secciones). Guarda el resultado en data/dataset/dataset_alpaca.json
 
@@ -497,25 +502,19 @@ Estructura:
 
 --- src/extraction/pdf_scanned.py ---
   Que hace: extrae texto de PDFs que son imagenes (documentos escaneados).
-  Estrategia: usa pymupdf para convertir cada pagina del PDF en imagen,
-  luego easyocr para reconocer el texto en la imagen.
-  Nota: es mas lento que la extraccion digital (~30 segundos por pagina).
-  Cuando se usa: idem, solo durante el pipeline offline.
-
---- src/dataset/cleaner.py ---
-  Que hace: limpia el texto extraido de los PDFs.
-  Elimina: numeros de pagina, encabezados/pies repetidos, espacios
-  multiples, caracteres especiales de escaneo, lineas vacias excesivas.
-  Por que importa: texto sucio genera pares QA de mala calidad, lo que
-  hace que el modelo aprenda respuestas con errores.
+  Estrategia: usa docling, que hace el OCR y devuelve Markdown directamente.
+  Nota: es mas lento que la extraccion digital y requiere GPU; docling va en
+  un venv aparte (requirements-docling.txt), se corre en la workstation.
+  Cuando se usa: idem, solo durante el pipeline offline (con --ocr).
 
 --- src/dataset/qa_builder.py ---
-  Que hace: transforma el texto limpio en pares pregunta-respuesta.
-  Estrategia heuristica: detecta patrones en el texto normativo (titulos
-  de articulos, CONSIDERANDO, RESUELVE, numerales, secciones) y genera
-  preguntas del tipo "¿Que establece el articulo X?" con la respuesta
-  siendo el contenido de ese articulo.
-  Formato de salida: Alpaca JSON [{instruction, input, output}].
+  Que hace: lee el .md estructurado (frontmatter + encabezados ##/###) y
+  genera los pares pregunta-respuesta.
+  Estrategia: usa el frontmatter (tipo, numero, año) para citar bien, y
+  los encabezados ### ARTICULO N para tomar el contenido real de cada
+  articulo como respuesta -> "¿Que establece el articulo X?" + su texto.
+  La limpieza de ruido ya viene hecha desde to_markdown (no hay cleaner
+  aparte). Formato de salida: Alpaca JSON [{instruction, input, output}].
     instruction: la pregunta.
     input: contexto adicional (generalmente vacio).
     output: la respuesta esperada.
@@ -549,14 +548,17 @@ Todos los scripts se ejecutan desde la raiz de CANUTO con el venv activo:
 --- scripts/extract_text.py ---
   Uso: python scripts\extract_text.py
   Que hace: itera todos los PDFs en PDF/, detecta si cada uno es
-  digital o escaneado, aplica la extraccion adecuada, limpia el texto
-  y lo guarda en data/extracted/ como <nombre_documento>.txt
+  digital o escaneado, aplica la extraccion adecuada (pymupdf4llm los
+  digitales; docling OCR los escaneados) y lo guarda en data/extracted/
+  espejando la estructura como <numero>_<anio>.md con frontmatter YAML.
+  Los escaneados/corruptos se listan en data/_ocr_queue.txt (procesar con
+  --ocr en la workstation con GPU).
   Cuando correr: cada vez que se agregan nuevos PDFs a PDF/.
-  Salida: data/extracted/*.txt (uno por PDF, ignorados por git).
+  Salida: data/extracted/**/*.md (uno por PDF, ignorados por git).
 
 --- scripts/build_dataset.py ---
   Uso: python scripts\build_dataset.py --mode heuristic
-  Que hace: lee todos los .txt de data/extracted/, aplica qa_builder.py
+  Que hace: lee todos los .md de data/extracted/, aplica qa_builder.py
   para generar pares QA automaticamente, y guarda el resultado en
   data/dataset/dataset_alpaca.json.
   Nota: sobreescribe el dataset existente. Si hay pares curados
@@ -752,9 +754,10 @@ data/checkpoints/ (IGNORADO POR GIT)
   (menos probabilidad de que falle a mitad).
 
 data/extracted/ (IGNORADO POR GIT)
-  Textos planos extraidos de los PDFs. Un archivo .txt por PDF.
+  Markdown estructurado extraido de los PDFs. Un archivo .md por PDF,
+  con frontmatter YAML y estructura legal (##/###/####).
   Se generan con scripts/extract_text.py.
-  Se ignoran en git porque se pueden regenerar.
+  Se ignoran en git porque se pueden regenerar desde PDF/.
 
 data/test_results.txt (IGNORADO POR GIT)
   Archivo de salida de scripts/test_model.py.
@@ -882,9 +885,9 @@ Cuando se reciban nuevos documentos de Unillanos (via SIRIUS u otros):
 
   1. Copiar los PDFs a la carpeta PDF/.
 
-  2. Regenerar el texto extraido:
+  2. Regenerar el Markdown extraido:
        python scripts\extract_text.py
-     Esto crea nuevos .txt en data/extracted/ para los PDFs nuevos.
+     Esto crea nuevos .md en data/extracted/ para los PDFs nuevos.
 
   3. Regenerar el dataset base:
        python scripts\build_dataset.py --mode heuristic
@@ -960,10 +963,12 @@ ERROR: OSError: [Errno 98] Address already in use
   Solucion: usar otro puerto: python ui\django_chatbot\run.py --port 8080
   O matar el proceso: Get-Process python | Stop-Process (PowerShell)
 
-ERROR durante extraccion de PDF: "Could not extract text"
-  Causa: el PDF es un escaneo y EasyOCR no esta instalado correctamente.
-  Solucion: verificar que easyocr y pymupdf estan en el venv.
-  El script marcara el PDF como "escaneado" y usara OCR automaticamente.
+ERROR durante extraccion de PDF: "docling no está instalado"
+  Causa: se corrio extract_text.py --ocr sin docling en el entorno.
+  Solucion: docling va en un venv APARTE en la workstation con GPU:
+    python -m venv venv-docling && venv-docling\Scripts\activate
+    pip install -r requirements-docling.txt
+  Sin --ocr, los escaneados solo se anotan en data/_ocr_queue.txt.
 
 ERROR durante entrenamiento en Colab: "CUDA out of memory"
   Causa: el batch_size es muy grande para la GPU T4 con SEQ_LEN=1024.

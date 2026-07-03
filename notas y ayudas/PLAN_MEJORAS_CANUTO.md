@@ -67,7 +67,7 @@ Ver: [URAG — Hybrid RAG for University Chatbots (HCMUT, 2025)](https://arxiv.o
 **Cómo implementarlo en CANUTO:**
 
 ```
-data/extracted/*.txt (35 archivos ya extraídos)
+data/extracted/**/*.md (696 documentos ya extraídos)
       ↓
 ChromaDB o FAISS (indexar chunks de texto)
       ↓
