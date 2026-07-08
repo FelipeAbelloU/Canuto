@@ -33,13 +33,13 @@ echo [3/4] Instalando PyTorch...
 echo.
 echo  Elige el tipo de instalacion:
 echo    1. Solo CPU (laptop i5-7200U)
-echo    2. CUDA 12.1 (workstation RTX 4090i)
+echo    2. CUDA cu126 (workstation RTX 4090i)
 echo.
 set /p opcion="Opcion (1 o 2): "
 
 if "%opcion%"=="2" (
-    echo Instalando PyTorch con soporte CUDA 12.1...
-    pip install torch --index-url https://download.pytorch.org/whl/cu121 --quiet
+    echo Instalando PyTorch con soporte CUDA cu126...
+    pip install torch --index-url https://download.pytorch.org/whl/cu126 --quiet
 ) else (
     echo Instalando PyTorch solo CPU...
     pip install torch --index-url https://download.pytorch.org/whl/cpu --quiet

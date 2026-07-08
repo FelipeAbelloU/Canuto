@@ -1,0 +1,3 @@
+# Los scripts de shell DEBEN conservar saltos de línea LF: con CRLF, Linux falla
+# con "bad interpreter: bash^M" al ejecutar install.sh / install-docling.sh.
+*.sh text eol=lf

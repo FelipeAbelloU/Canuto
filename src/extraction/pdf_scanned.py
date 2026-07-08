@@ -34,8 +34,10 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
     except ImportError:
         raise ImportError(
             "docling no está instalado. Va en un venv APARTE (ver requirements-docling.txt).\n"
-            "  python -m venv venv-docling && venv-docling\\Scripts\\activate\n"
-            "  pip install -r requirements-docling.txt"
+            "  Linux:    python3 -m venv venv-docling && source venv-docling/bin/activate\n"
+            "  Windows:  python -m venv venv-docling && venv-docling\\Scripts\\activate\n"
+            "  pip install -r requirements-docling.txt\n"
+            "  (en Linux con GPU, más simple: bash install-docling.sh)"
         )
 
     # docling hace el OCR y devuelve el documento ya convertido a Markdown.
