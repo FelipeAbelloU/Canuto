@@ -1,0 +1,29 @@
+# CANUTO — dependencias del venv PRINCIPAL para EXTRACCIÓN PDF -> Markdown + dataset.
+#
+# Solo lo necesario para:
+#   scripts/extract_text.py      (PDFs digitales -> .md)
+#   scripts/build_dataset.py     (.md -> dataset QA JSON)
+#
+# NO incluye torch ni el stack de inferencia/UI/entrenamiento (eso está en
+# requirements.txt, fase posterior). La extracción digital NO usa torch, así que
+# separar estas deps evita que un pin pesado que falle en 3.12 aborte la instalación
+# y bloquee el pipeline PDF->.md.
+#
+# El OCR de los escaneados va en un venv APARTE: requirements-docling.txt.
+#
+# Verificado para Python 3.12 / Linux:
+#   pymupdf4llm/pdfplumber = pure-python; PyMuPDF = wheel abi3 cp310 (corre en 3.12).
+#
+# Instalación (desde CANUTO/):
+#   python3 -m venv venv && source venv/bin/activate
+#   pip install -r requirements-extract.txt
+# (o simplemente: bash install.sh)
+
+# --- Extracción PDF -> Markdown ---
+pymupdf4llm==1.28.0
+pdfplumber==0.11.9
+PyMuPDF==1.28.0
+
+# --- Configuración ---
+PyYAML==6.0.3
+python-dotenv==1.2.2

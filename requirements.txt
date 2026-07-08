@@ -1,8 +1,13 @@
-# CANUTO — dependencias (Python 3.11+)
+# CANUTO — dependencias del stack COMPLETO (inferencia + UI + API + entrenamiento).
+# Python 3.11+ (verificado también en 3.12).
+#
+# NOTA: para SOLO extraer PDF -> Markdown y armar el dataset NO hace falta este
+# archivo (ni torch); usar el venv ligero de requirements-extract.txt (o install.sh).
 #
 # torch va aparte (el wheel depende del hardware); instalar ANTES:
 #   CPU:  pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu
-#   CUDA: pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cu121
+#   CUDA: pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cu126
+#         (cu126 = única línea con torch 2.12 para cp312; corre bajo CUDA 12.6+/13.x)
 # luego: pip install -r requirements.txt
 #
 # El OCR de escaneados usa docling en un venv APARTE (requirements-docling.txt),
