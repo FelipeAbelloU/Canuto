@@ -5,10 +5,11 @@
 # archivo (ni torch); usar el venv ligero de requirements-extract.txt (o install.sh).
 #
 # torch va aparte (el wheel depende del hardware); instalar ANTES:
-#   CPU:  pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu
-#   CUDA: pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cu126
-#         (cu126 = única línea con torch 2.12 para cp312; corre bajo CUDA 12.6+/13.x)
-# luego: pip install -r requirements.txt
+#   CPU:  pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   GPU (workstation, RTX 5080):
+#         pip install torch --index-url https://download.pytorch.org/whl/cu130
+#   La RTX 5080 es Blackwell y necesita CUDA 13 (cu130); el driver CUDA 13.2 la corre.
+# luego: pip install -r requirements.txt   (o usar install.sh)
 #
 # El OCR de escaneados usa docling en un venv APARTE (requirements-docling.txt),
 # porque exige transformers moderno que rompe el stack de inferencia/entrenamiento.
@@ -30,10 +31,11 @@ accelerate==1.13.0
 huggingface_hub==0.36.2
 numpy==2.4.6
 
-# --- Fine-tuning con LoRA (solo necesario para scripts/train.py) ---
+# --- Fine-tuning con LoRA / QLoRA ---
 peft==0.19.1
 trl==0.12.2
 datasets==4.8.5
+bitsandbytes   # cuantizacion 4-bit para entrenar 7B/14B en la GPU de 16 GB
 
 # --- Interfaz web Django (CANUTO) ---
 Django==5.2.15

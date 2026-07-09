@@ -1,44 +1,22 @@
-#!/usr/bin/env bash
-# =============================================================================
-#  CANUTO — instalación del venv PRINCIPAL de extracción (Linux)
-# =============================================================================
-#  Prepara el pipeline PDF -> Markdown para PDFs DIGITALES y la generación del
-#  dataset. NO instala torch (la extracción digital no lo usa).
+#!/bin/bash
+# Instala el entorno principal de CANUTO en la workstation (Ubuntu, GPU RTX 5080).
+# Sirve para todo: extraer PDFs, armar el dataset, entrenar, inferir y la web.
+# El OCR con docling va en un entorno aparte: usar install-docling.sh.
 #
-#  El OCR de los escaneados (~73% del corpus) va en un venv APARTE con GPU:
-#      bash install-docling.sh
-#
-#  Uso (desde la carpeta CANUTO/):
-#      bash install.sh
-# =============================================================================
-set -e
+# Clonar el proyecto dentro de /bodega (hay espacio) y correr desde ahi:
+#   bash install.sh
 
-echo "============================================================"
-echo " CANUTO — venv principal (extracción digital + dataset)"
-echo "============================================================"
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
 
-PY="${PYTHON:-python3}"
-echo "[Python] $($PY --version)"
+# PyTorch para la RTX 5080 (Blackwell -> CUDA 13, wheels cu130)
+pip install torch --index-url https://download.pytorch.org/whl/cu130
 
-echo "[1/3] Creando entorno virtual venv/ ..."
-"$PY" -m venv venv
+# Resto de dependencias del proyecto
+pip install -r requirements.txt
 
-echo "[2/3] Actualizando pip ..."
-./venv/bin/python -m pip install --upgrade pip
+# Comprobacion rapida de que la GPU se ve
+python -c "import torch; print('CUDA disponible:', torch.cuda.is_available())"
 
-echo "[3/3] Instalando dependencias de extracción (sin torch) ..."
-./venv/bin/pip install -r requirements-extract.txt
-
-echo
-echo "============================================================"
-echo " Instalación completada"
-echo "============================================================"
-echo
-echo "Siguientes pasos:"
-echo "  source venv/bin/activate"
-echo "  # copiar los PDFs a PDF/  (estructura <año>/si/normatividad/<TIPO>/)"
-echo "  python scripts/extract_text.py                 # digitales -> data/extracted/*.md (+ cola OCR)"
-echo "  python scripts/build_dataset.py --mode heuristic"
-echo
-echo "OCR de escaneados (GPU, venv aparte):"
-echo "  bash install-docling.sh"
+echo "Listo. Activar con: source venv/bin/activate"

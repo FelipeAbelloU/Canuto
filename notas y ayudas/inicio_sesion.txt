@@ -1,9 +1,9 @@
-# Paso 0 — venv aparte CON GPU (workstation Linux, Python 3.12, CUDA 13.2 -> cu126)
-#   Atajo: bash install-docling.sh  (crea el venv, instala y verifica la GPU)
+# Paso 0 — venv aparte CON GPU (workstation Ubuntu, Python 3.12, RTX 5080 -> cu130)
+#   Atajo: bash install-docling.sh
 python3 -m venv venv-docling
 source venv-docling/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cu126   # CUDA primero
-pip install -r requirements-docling.txt --extra-index-url https://download.pytorch.org/whl/cu126
+pip install torch --index-url https://download.pytorch.org/whl/cu130   # CUDA primero
+pip install -r requirements-docling.txt --extra-index-url https://download.pytorch.org/whl/cu130
 
 # Paso 1 — smoke test docling en 5–10 escaneados variados y REVISAR calidad
 python scripts/extract_text.py --ocr --years 2015 --limit 10

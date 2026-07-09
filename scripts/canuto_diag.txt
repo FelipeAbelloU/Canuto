@@ -1,0 +1,142 @@
+############################################################
+#  CANUTO - Diagnostico de workstation
+#  Fecha: jue 09 jul 2026 00:42:46 -05
+#  Host:  WDELL3680   Usuario: adalab
+############################################################
+
+==================== SISTEMA OPERATIVO ====================
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+-- Kernel / arquitectura --
+Linux WDELL3680 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+==================== glibc (define que 'wheels' de Python sirven) ====================
+ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39
+
+==================== CPU ====================
+CPU(s):                                   28
+Nombre del modelo:                        Intel(R) Core(TM) i7-14700
+CPU(s) factor de escala MHz:              19%
+Indicadores:                              fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr ibt flush_l1d arch_capabilities
+CPU(s) del nodo NUMA 0:                   0-27
+-- Nucleos logicos (nproc) --
+28
+
+==================== MEMORIA RAM ====================
+               total       usado       libre  compartido   búf/caché  disponible
+Mem:            93Gi       8,8Gi        29Gi       123Mi        56Gi        85Gi
+Inter:         8,0Gi          0B       8,0Gi
+-- MemTotal exacto --
+MemTotal:       98550436 kB
+MemAvailable:   89313388 kB
+
+==================== DISCO (espacio libre - importante para modelos y cache HF) ====================
+/dev/nvme0n1p2   233G   183G   39G  83% /
+/dev/sdb         3,6T   2,7T  745G  79% /bodega
+S.ficheros     Tamaño Usados  Disp Uso% Montado en
+
+==================== GPU (NVIDIA) ====================
+Thu Jul  9 00:42:46 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 595.71.05              Driver Version: 595.71.05      CUDA Version: 13.2     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 5080        Off |   00000000:01:00.0  On |                  N/A |
+|  0%   47C    P8             31W /  360W |    3326MiB /  16303MiB |     10%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A            5195      G   /usr/lib/xorg/Xorg                      235MiB |
+|    0   N/A  N/A            5356    C+G   ...c/gnome-remote-desktop-daemon        264MiB |
+|    0   N/A  N/A            5439      G   /usr/bin/gnome-shell                     89MiB |
+|    0   N/A  N/A            6007      G   ...exec/xdg-desktop-portal-gnome        136MiB |
+|    0   N/A  N/A          108965      G   /opt/LM-Studio/lm-studio                 20MiB |
+|    0   N/A  N/A          128139      G   /usr/bin/nautilus                       164MiB |
+|    0   N/A  N/A          129443      C   /usr/bin/python3                       2338MiB |
++-----------------------------------------------------------------------------------------+
+-- Resumen GPU --
+name, memory.total [MiB], memory.free [MiB], driver_version
+NVIDIA GeForce RTX 5080, 16303 MiB, 12507 MiB, 595.71.05
+
+==================== CUDA toolkit (nvcc) - puede diferir del CUDA del driver ====================
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2024 NVIDIA Corporation
+Built on Tue_Feb_27_16:19:38_PST_2024
+Cuda compilation tools, release 12.4, V12.4.99
+Build cuda_12.4.r12.4/compiler.33961263_0
+-- Librerias CUDA runtime visibles --
+	libcudart.so.12 (libc6,x86-64) => /usr/local/cuda-12.4/targets/x86_64-linux/lib/libcudart.so.12
+	libcudart.so (libc6,x86-64) => /usr/local/cuda-12.4/targets/x86_64-linux/lib/libcudart.so
+	libcublasLt.so.12 (libc6,x86-64) => /usr/local/cuda-12.4/targets/x86_64-linux/lib/libcublasLt.so.12
+	libcublasLt.so (libc6,x86-64) => /usr/local/cuda-12.4/targets/x86_64-linux/lib/libcublasLt.so
+	libcublas.so.12 (libc6,x86-64) => /usr/local/cuda-12.4/targets/x86_64-linux/lib/libcublas.so.12
+	libcublas.so (libc6,x86-64) => /usr/local/cuda-12.4/targets/x86_64-linux/lib/libcublas.so
+
+==================== PYTHON ====================
+-- python3 --
+Python 3.12.9
+   ruta: /home/adalab/.pyenv/shims/python3
+-- python (por si acaso) --
+Python 3.12.9
+-- pip3 --
+pip 25.0 from /home/adalab/miniconda3/lib/python3.12/site-packages/pip (python 3.12)
+-- modulo venv (necesario para crear entornos) --
+  venv: OK
+-- cabeceras de desarrollo (python3-dev) --
+  python3-dev: OK (/home/adalab/miniconda3/include/python3.12/Python.h)
+
+==================== HERRAMIENTAS DE COMPILACION (por si algun paquete compila) ====================
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+GNU Make 4.3
+  [no disponible: cmake]
+
+==================== GIT ====================
+git version 2.43.0
+
+==================== ENTORNOS EXISTENTES (conda / otros) ====================
+conda 25.5.1
+-- carpetas de venv/conda que ya existan en HOME --
+/home/adalab/.conda
+/home/adalab/miniconda3
+  (ninguna)
+
+==================== RED (puede llegar a los repos de paquetes?) ====================
+-- Variables de proxy --
+  (sin proxy configurado)
+  https://pypi.org -> HTTP 200
+  https://files.pythonhosted.org -> HTTP 200
+  https://download.pytorch.org -> HTTP 403
+  https://huggingface.co -> HTTP 200
+
+==================== LOCALE / UTF-8 ====================
+LANG=es_ES.UTF-8
+LANGUAGE=
+LC_ALL=
+
+############################################################
+#  Fin del diagnostico. Envia esta salida (o canuto_diag.txt).
+############################################################
