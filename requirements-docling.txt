@@ -3,15 +3,14 @@
 # docling exige transformers moderno que rompe el stack de inferencia/entrenamiento,
 # por eso vive en su propio venv. Se usa solo para OCR-izar los PDFs escaneados.
 #
-# En la workstation con GPU (Linux, Python 3.12, driver 595 / CUDA 13.2):
+# En la workstation con GPU (Ubuntu, Python 3.12, RTX 5080):
 #   python3 -m venv venv-docling && source venv-docling/bin/activate
-#   pip install torch --index-url https://download.pytorch.org/whl/cu126
-#   pip install -r requirements-docling.txt --extra-index-url https://download.pytorch.org/whl/cu126
-# (o simplemente: bash install-docling.sh, que además verifica torch.cuda.is_available())
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+#   pip install -r requirements-docling.txt --extra-index-url https://download.pytorch.org/whl/cu130
+# (o simplemente: bash install-docling.sh)
 #
-# cu126 es la única línea que publica torch 2.12 para cp312; el driver CUDA 13.2 la
-# corre (forward-compatible). El --extra-index-url evita que, al resolver docling,
-# pip cambie torch por una build CPU desde PyPI.
+# La RTX 5080 es Blackwell y necesita CUDA 13 (cu130). El --extra-index-url evita que,
+# al resolver docling, pip cambie torch por una version CPU desde PyPI.
 #
 # Flujo de dos pasos (MISMO --output-dir):
 #   1) venv principal:  python scripts/extract_text.py         (digitales)
