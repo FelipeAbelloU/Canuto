@@ -306,13 +306,6 @@ MODO RUNTIME (el chatbot respondiendo preguntas)
 ================================================================
 
 CANUTO/
-  CLAUDE.md              Instrucciones para el asistente de IA Claude Code.
-                         No afecta el funcionamiento del chatbot. Es como
-                         un manual de contexto para la herramienta de desarrollo.
-
-  CLAUDE.md (raiz Tesis) Hay otro CLAUDE.md un nivel arriba, en Tesis/.
-                         Ese aplica a toda la tesis; este solo a CANUTO.
-
   requirements.txt       Lista de librerias Python necesarias.
                          Se instala con: pip install -r requirements.txt
                          Ojo: PyTorch va ANTES de este archivo. Ver install.bat.
@@ -336,7 +329,6 @@ CANUTO/
   data/                  Ver seccion 11.
   PDF/                   Ver seccion 12.
   docs/                  Ver seccion 13.
-  memory/                Archivos de contexto para Claude Code (no afectan CANUTO).
   notas y ayudas/        Guias de uso, esta guia, y scripts de referencia.
 
 

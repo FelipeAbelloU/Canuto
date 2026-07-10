@@ -46,8 +46,13 @@ data/vectorstore/
 # IDEs
 .idea/
 
-# Configuración local de Claude Code (rutas específicas de la máquina)
+# Configuración local del editor (rutas específicas de la máquina)
 .claude/
+
+# Notas de trabajo y contexto local — no forman parte del proyecto entregable
+memory/
+CLAUDE.md
+notas y ayudas/prompts tesis.txt
 
 # Mockup React (referencia de diseño — código fuente de Figma Make, no es parte del proyecto)
 mockup_chatbot/
