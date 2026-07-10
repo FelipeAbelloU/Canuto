@@ -13,6 +13,14 @@ PDF/
 # Textos extraídos (se regeneran con scripts/extract_text.py)
 data/extracted/
 
+# Notas de trabajo personales (no forman parte del proyecto)
+retomar.txt
+
+# Splits y resultados (se regeneran con split_dataset.py / evaluate.py)
+data/dataset/train.json
+data/dataset/test.json
+data/dataset/resultados_evaluacion.json
+
 # Cola de OCR para la workstation (se regenera al correr extract_text.py)
 data/_ocr_queue.txt
 

@@ -38,7 +38,8 @@ LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj",
 
 def parse_args():
     p = argparse.ArgumentParser(description="Fine-tuning normativa Unillanos con QLoRA (GPU)")
-    p.add_argument("--dataset", default=str(ROOT / "data/dataset/dataset_alpaca.json"))
+    p.add_argument("--dataset", default=str(ROOT / "data/dataset/train.json"),
+                   help="Split de entrenamiento (correr antes scripts/split_dataset.py)")
     p.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct",
                    help="Modelo base (usa Qwen/Qwen2.5-14B-Instruct para probar 14B)")
     p.add_argument("--output", default=str(ROOT / "data/checkpoints/unillanos-7b"),
