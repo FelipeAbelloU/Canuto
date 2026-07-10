@@ -46,6 +46,7 @@ def parse_args():
     p.add_argument("--config", default=str(ROOT / "config/config.yaml"))
     p.add_argument("--epochs", type=int, default=4)
     p.add_argument("--rank", type=int, default=16)
+    p.add_argument("--lr", type=float, default=2e-4, help="Learning rate")
     p.add_argument("--seq-len", type=int, default=1024)
     p.add_argument("--wandb", action="store_true", help="Registrar metricas en Weights & Biases")
     p.add_argument("--smoke", action="store_true", help="Prueba rapida de 3 pasos")
@@ -134,7 +135,8 @@ def main():
         max_steps=3 if args.smoke else -1,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=8,
-        learning_rate=2e-4,
+        learning_rate=args.lr,
+        optim="paged_adamw_8bit",   # optimizador paginado: menos VRAM (clave para 14B en 16 GB)
         warmup_ratio=0.1,
         lr_scheduler_type="cosine",
         logging_steps=1 if args.smoke else 10,
