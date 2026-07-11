@@ -45,9 +45,6 @@ sacrebleu==2.4.3
 # --- Interfaz web Django (CANUTO) ---
 Django==5.2.15
 
-# --- Interfaz web alternativa (Gradio, opcional) ---
-gradio==6.15.2
-
 # --- API REST (integración con SIRIUS) ---
 fastapi==0.136.3
 starlette==1.2.0
