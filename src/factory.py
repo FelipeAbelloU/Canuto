@@ -23,9 +23,16 @@ def _create_model(config: dict):
     )
 
 
-def create_pipeline(config_path: str = "config/config.yaml") -> ChatPipeline:
-    """Construye el pipeline de chat desde la configuración."""
+def create_pipeline(config_path: str = "config/config.yaml", checkpoint_override: str = None) -> ChatPipeline:
+    """Construye el pipeline de chat desde la configuración.
+
+    checkpoint_override: si se pasa, usa ese checkpoint en vez del de config.yaml
+    (util para evaluar varios adaptadores sin editar la config). El device sigue
+    saliendo del perfil de hardware.
+    """
     config = load_config(config_path)
+    if checkpoint_override:
+        config.setdefault("model", {})["checkpoint_path"] = checkpoint_override
     model = _create_model(config)
     chat_cfg = config.get("chat", {})
     return ChatPipeline(

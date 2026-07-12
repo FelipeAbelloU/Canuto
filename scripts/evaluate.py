@@ -44,6 +44,8 @@ def parse_args():
     p.add_argument("--config", default=str(ROOT / "config/config.yaml"))
     p.add_argument("--out", default=str(ROOT / "data/dataset/resultados_evaluacion.json"))
     p.add_argument("--limit", type=int, default=0, help="Evaluar solo N ejemplos (0 = todos)")
+    p.add_argument("--checkpoint", default=None,
+                   help="Adaptador a evaluar (ignora el checkpoint_path de config.yaml)")
     return p.parse_args()
 
 
@@ -71,10 +73,11 @@ def generar_respuestas(pipeline, preguntas):
 def main():
     args = parse_args()
 
-    pipeline = create_pipeline(args.config)
+    pipeline = create_pipeline(args.config, checkpoint_override=args.checkpoint)
     if pipeline.model is None or not pipeline.model.is_available():
         print("No hay checkpoint configurado en config.yaml (model.checkpoint_path).")
         sys.exit(1)
+    print(f"Modelo: {pipeline.model.checkpoint_path} (device: {pipeline.model.device})")
 
     with open(args.test, encoding="utf-8") as f:
         data = json.load(f)
