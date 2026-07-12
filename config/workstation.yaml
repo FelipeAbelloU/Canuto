@@ -1,6 +1,6 @@
-# Perfil: workstation (Xeon Silver 4208, 32 GB RAM, RTX 4090i — CUDA 24 GB)
+# Perfil: workstation (i7-14700, 93 GB RAM, RTX 5080 — CUDA 16 GB)
 # Para cargar el checkpoint: asegúrate de que checkpoint_path en config.yaml apunte al directorio correcto.
 model:
   device: cuda
   max_new_tokens: 512
-  temperature: 0.7
+  temperature: 0.3   # baja: respuestas más consistentes y menos alucinación (normativa)
