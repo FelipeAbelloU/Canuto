@@ -1,8 +1,0 @@
-# Perfil: laptop (Intel i5-7200U, 16 GB RAM, MX130 — CPU only)
-# GPU no apta para modelos LLM — inferencia en CPU.
-# Modelo base: Qwen/Qwen2.5-3B-Instruct (~6 GB RAM, Apache 2.0)
-model:
-  device: cpu
-  max_new_tokens: 256
-  temperature: 0.7
-  top_p: 0.9
