@@ -2,7 +2,6 @@
 
 Uso:
     python scripts/chat_cli.py
-    python scripts/chat_cli.py --config config/workstation.yaml
 
 Comandos durante el chat:
     salir  — termina la sesión

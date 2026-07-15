@@ -23,7 +23,7 @@ def _get_pipeline():
     if _pipeline is None:
         config_path = _CANUTO_ROOT / "config" / "config.yaml"
 
-        # Cambiar CWD temporalmente para que load_config encuentre los perfiles
+        # Cambiar CWD temporalmente para que las rutas relativas de config resuelvan bien
         original_cwd = os.getcwd()
         os.chdir(str(_CANUTO_ROOT))
         try:

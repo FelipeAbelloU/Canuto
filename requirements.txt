@@ -1,15 +1,9 @@
-# CANUTO — dependencias del stack COMPLETO (inferencia + UI + API + entrenamiento).
-# Python 3.11+ (verificado también en 3.12).
+# CANUTO — dependencias del stack COMPLETO (extracción + dataset + entrenamiento + inferencia + UI + API).
+# Workstation Ubuntu, Python 3.12.
 #
-# NOTA: para SOLO extraer PDF -> Markdown y armar el dataset NO hace falta este
-# archivo (ni torch); usar el venv ligero de requirements-extract.txt (o install.sh).
-#
-# torch va aparte (el wheel depende del hardware); instalar ANTES:
-#   CPU:  pip install torch --index-url https://download.pytorch.org/whl/cpu
-#   GPU (workstation, RTX 5080):
-#         pip install torch --index-url https://download.pytorch.org/whl/cu130
-#   La RTX 5080 es Blackwell y necesita CUDA 13 (cu130); el driver CUDA 13.2 la corre.
-# luego: pip install -r requirements.txt   (o usar install.sh)
+# torch va aparte (instalar ANTES): la RTX 5080 es Blackwell y necesita CUDA 13 (cu130):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+# luego: pip install -r requirements.txt   (o usar install.sh, que hace ambos pasos)
 #
 # El OCR de escaneados usa docling en un venv APARTE (requirements-docling.txt),
 # porque exige transformers moderno que rompe el stack de inferencia/entrenamiento.

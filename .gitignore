@@ -16,7 +16,8 @@ data/extracted/
 # Notas de trabajo personales (no forman parte del proyecto)
 retomar.txt
 
-# Splits y resultados (se regeneran con split_dataset.py / evaluate.py)
+# Dataset y splits (se regeneran con build_dataset.py / split_dataset.py / evaluate.py)
+data/dataset/dataset_alpaca.json
 data/dataset/train.json
 data/dataset/test.json
 data/dataset/resultados_evaluacion.json
