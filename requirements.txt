@@ -31,10 +31,12 @@ trl==0.12.2
 datasets==4.8.5
 bitsandbytes   # cuantizacion 4-bit para entrenar 7B/14B en la GPU de 16 GB
 
-# --- Metricas de evaluacion (scripts/evaluate.py) ---
+# --- Metricas de evaluacion + bitacora (scripts/evaluate.py) ---
 bert-score==0.3.13
 rouge-score==0.1.2
 sacrebleu==2.4.3
+sentence-transformers==5.5.1   # similitud coseno semantica
+openpyxl==3.1.5                # bitacora de experimentos en Excel
 
 # --- Interfaz web Django (CANUTO) ---
 Django==5.2.15

@@ -86,6 +86,17 @@ class FineTunedModel:
         )
 
     @property
+    def hf_model(self):
+        """Modelo HuggingFace cargado (para métricas como perplejidad en evaluate.py)."""
+        self._load()
+        return self._model
+
+    @property
+    def tokenizer(self):
+        self._load()
+        return self._tokenizer
+
+    @property
     def name(self) -> str:
         return Path(self.checkpoint_path).name if self.checkpoint_path else "sin modelo"
 

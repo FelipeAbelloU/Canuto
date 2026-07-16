@@ -27,8 +27,7 @@ def create_pipeline(config_path: str = "config/config.yaml", checkpoint_override
     """Construye el pipeline de chat desde la configuración.
 
     checkpoint_override: si se pasa, usa ese checkpoint en vez del de config.yaml
-    (util para evaluar varios adaptadores sin editar la config). El device sigue
-    saliendo del perfil de hardware.
+    (util para evaluar varios adaptadores sin editar la config).
     """
     config = load_config(config_path)
     if checkpoint_override:

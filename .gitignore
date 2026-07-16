@@ -22,6 +22,9 @@ data/dataset/train.json
 data/dataset/test.json
 data/dataset/resultados_evaluacion.json
 
+# Bitacora de experimentos (se genera al evaluar; vive en la workstation)
+data/bitacora.xlsx
+
 # Cola de OCR para la workstation (se regenera al correr extract_text.py)
 data/_ocr_queue.txt
 
