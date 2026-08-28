@@ -7,7 +7,7 @@
 model:
   # Ruta al adaptador LoRA entrenado (carpeta con adapter_config.json).
   # Se apunta al ganador del barrido, ej: "data/checkpoints/7b-e3-lr2e4-r16"
-  checkpoint_path: ""
+  checkpoint_path: "data/checkpoints/7b-e3-lr2e4-r16"
   device: cuda         # workstation con RTX 5080
   max_new_tokens: 512
   temperature: 0.3     # baja: respuestas más consistentes y menos alucinación (normativa)
@@ -25,7 +25,7 @@ dataset:
   output_dir: "data/dataset"   # dataset JSON de salida
   format: "alpaca"             # alpaca | sharegpt
 
-# --- Chat conversacional ---
+# --- Chat conversacional --- aun en prueba
 chat:
   max_history: 5
   system_prompt: |
