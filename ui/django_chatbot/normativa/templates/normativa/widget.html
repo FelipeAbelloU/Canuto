@@ -151,7 +151,7 @@
       const res = await fetch('/api/query/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question, user_id: getUserId() })
       });
       const data = await res.json();
       document.getElementById('widget-typing')?.remove();

@@ -1,16 +1,10 @@
-"""Genera pares pregunta-respuesta desde documentos normativos en Markdown.
+"""Genera los pares pregunta-respuesta a partir de los documentos en Markdown.
 
-Lee el .md estructurado que produce extract_text.py y aprovecha:
-  - el frontmatter (tipo, número, año, título) → citas exactas sin adivinar,
-  - los encabezados (## CONSIDERANDO/RESUELVE, ### ARTÍCULO N, #### PARÁGRAFO)
-    → contenido real de cada artículo, sin regex frágiles sobre texto crudo.
+Lee el .md que produce extract_text.py y usa el frontmatter (tipo, numero, año,
+titulo) para armar la cita, y los encabezados (## CONSIDERANDO/RESUELVE,
+### ARTICULO N, #### PARAGRAFO) para sacar el contenido de cada articulo.
 
-Las respuestas son el texto real del documento con su cita, para que el modelo
-aprenda hechos fundamentados y no invente.
-
-Formatos de salida:
-  alpaca:   {"instruction": ..., "input": ..., "output": ...}
-  sharegpt: {"conversations": [{"from": "human", ...}, {"from": "gpt", ...}]}
+Formato de salida (alpaca): {"instruction": ..., "input": ..., "output": ...}
 """
 from __future__ import annotations
 
@@ -24,20 +18,10 @@ from dataclasses import dataclass, field
 class QAPair:
     question: str
     answer: str
-    source: str = ""
 
 
 def to_alpaca(pair: QAPair) -> dict:
     return {"instruction": pair.question, "input": "", "output": pair.answer}
-
-
-def to_sharegpt(pair: QAPair) -> dict:
-    return {
-        "conversations": [
-            {"from": "human", "value": pair.question},
-            {"from": "gpt", "value": pair.answer},
-        ]
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +199,6 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
         return []
 
     tipo, cita, _ = _doc_ref(meta)
-    source = meta.get("fuente") or cita
     la, La, de_la = _gender(tipo)
 
     # Legislación nacional: se cita sin atribuirla a Unillanos.
@@ -232,8 +215,8 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
         # Añadir el primer artículo como contexto de lo que dispone.
         if st.articles:
             intro_ans += f" En su artículo {st.articles[0][0] or '1'} establece: {st.articles[0][1]}"
-        pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans, source))
-        pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans, source))
+        pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans))
+        pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
     # ── 2. Un par por artículo (el núcleo del dataset) ────────────────────
     # Se garantiza un número ÚNICO por artículo para no crear preguntas
@@ -254,7 +237,7 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
 
         q = f"¿Qué establece el artículo {num} {de_la} {cita}{suf_q}?"
         a = f"Según el artículo {num} {de_la} {cita}{entidad}, se establece: {content}"
-        pairs.append(QAPair(q, a, source))
+        pairs.append(QAPair(q, a))
 
     # ── 3. Fallback: documentos sin artículos (actas, comunicados) ────────
     if not st.articles:
@@ -264,13 +247,11 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
                 pairs.append(QAPair(
                     f"¿Qué dispone {la} {cita}{suf_q}?",
                     f"{La} {cita}{entidad} dispone: {cuerpo[:1200]}",
-                    source,
                 ))
             if st.considerando:
                 pairs.append(QAPair(
                     f"¿Cuál es el fundamento {de_la} {cita}{suf_q}?",
                     f"{La} {cita}{entidad} considera: {st.considerando[:1200]}",
-                    source,
                 ))
 
     # ── 4. Vigencia (si aparece explícita) ────────────────────────────────
@@ -280,34 +261,16 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
         pairs.append(QAPair(
             f"¿Desde cuándo rige {la} {cita}{suf_q}?",
             f"{La} {cita}{entidad} {vig.group(1).strip()}.",
-            source,
         ))
 
     return pairs[:max_pairs]
 
 
-def generate_template(meta: dict, n: int = 5) -> list[QAPair]:
-    """Genera plantillas vacías para completar manualmente."""
-    if _skip_type(meta.get("tipo", "")):
-        return []
-    _, cita, _ = _doc_ref(meta)
-    source = meta.get("fuente") or cita
-    return [
-        QAPair(
-            question=f"[PREGUNTA {i + 1} sobre {cita}]",
-            answer=f"[RESPUESTA {i + 1} — completar con información de {cita}]",
-            source=source,
-        )
-        for i in range(n)
-    ]
-
-
-def save_dataset(pairs: list[QAPair], output_path: str | Path, fmt: str = "alpaca") -> None:
-    """Guarda el dataset en formato JSON alpaca o sharegpt."""
+def save_dataset(pairs: list[QAPair], output_path: str | Path) -> None:
+    """Guarda el dataset en un JSON con formato alpaca."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    converter = to_alpaca if fmt == "alpaca" else to_sharegpt
-    entries = [converter(p) for p in pairs]
+    entries = [to_alpaca(p) for p in pairs]
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(entries, f, ensure_ascii=False, indent=2)
     print(f"  Dataset guardado: {output_path} ({len(entries)} entradas)")

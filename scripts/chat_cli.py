@@ -1,11 +1,9 @@
-"""Chat por terminal con el asistente normativo.
+"""Chat por terminal con CANUTO.
 
 Uso:
     python scripts/chat_cli.py
 
-Comandos durante el chat:
-    salir  — termina la sesión
-    reset  — inicia nueva conversación (borra historial)
+Dentro del chat: "salir" termina y "reset" empieza una conversacion nueva.
 """
 import sys
 from pathlib import Path
@@ -26,10 +24,8 @@ def main():
     parser.add_argument("--config", default="config/config.yaml")
     args = parser.parse_args()
 
-    print("=" * 60)
-    print("  Asistente Normativo Unillanos — Chat Terminal")
-    print("=" * 60)
-    print("  Cargando pipeline...")
+    print("CANUTO — Asistente Normativo Unillanos")
+    print("Cargando...")
 
     pipeline = create_pipeline(args.config)
 

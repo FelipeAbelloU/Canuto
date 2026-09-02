@@ -58,8 +58,18 @@
 
   {% block content %}{% endblock %}
 
-  <!-- Script para modo oscuro (persiste en localStorage) -->
   <script>
+    // Identificador del navegador, para que cada usuario tenga su propia conversacion.
+    function getUserId() {
+      let id = localStorage.getItem('canuto-user');
+      if (!id) {
+        id = Math.random().toString(36).slice(2);
+        localStorage.setItem('canuto-user', id);
+      }
+      return id;
+    }
+
+    // Modo oscuro (se recuerda en localStorage)
     function initTheme() {
       const saved = localStorage.getItem('canuto-theme');
       if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {

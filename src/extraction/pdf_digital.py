@@ -1,7 +1,7 @@
 """Extrae PDFs digitales (con capa de texto) a Markdown.
 
-Usa pymupdf4llm (elegido en docs/comparacion_extraccion_md.md); si falla,
-cae a pdfplumber. También marca la capa de texto corrupta para desviarla a OCR.
+Usa pymupdf4llm y, si falla, cae a pdfplumber. Tambien marca la capa de
+texto corrupta para desviar el PDF a OCR.
 """
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
+"""Vistas de la web de CANUTO: muestra las paginas y responde las preguntas."""
 import json
-import os
 from pathlib import Path
 
 from django.http import JsonResponse
@@ -7,77 +7,74 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-# Raíz del proyecto CANUTO (4 niveles arriba de este archivo)
-_CANUTO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+RAIZ = Path(__file__).resolve().parent.parent.parent.parent
 
-# Pipeline compartido entre todas las peticiones (se carga una sola vez)
-_pipeline = None
+# El modelo se carga una sola vez porque pesa varios GB, pero cada usuario tiene
+# su propia conversacion para que no se le mezcle el historial con el de otro.
+_modelo = None
+_max_history = 5
+_conversaciones = {}
 
 
-def _get_pipeline():
-    """Carga el pipeline la primera vez que se necesita.
-    Resuelve el checkpoint_path a ruta absoluta para que funcione
-    independientemente del directorio de trabajo actual de Django.
-    """
-    global _pipeline
-    if _pipeline is None:
-        config_path = _CANUTO_ROOT / "config" / "config.yaml"
+def _get_modelo():
+    """Carga el modelo la primera vez que se necesita."""
+    global _modelo, _max_history
+    if _modelo is None:
+        from src.config_loader import load_config
+        from src.factory import create_model
 
-        # Cambiar CWD temporalmente para que las rutas relativas de config resuelvan bien
-        original_cwd = os.getcwd()
-        os.chdir(str(_CANUTO_ROOT))
-        try:
-            from src.factory import create_pipeline
-            _pipeline = create_pipeline(str(config_path))
-        finally:
-            os.chdir(original_cwd)
+        config = load_config(str(RAIZ / "config" / "config.yaml"))
+        # La ruta del checkpoint viene relativa a la raiz del proyecto.
+        ruta = config.get("model", {}).get("checkpoint_path", "")
+        if ruta and not Path(ruta).is_absolute():
+            config["model"]["checkpoint_path"] = str(RAIZ / ruta)
+        _max_history = config.get("chat", {}).get("max_history", 5)
+        _modelo = create_model(config)
+    return _modelo
 
-        # Resolver checkpoint_path a ruta absoluta para que is_available()
-        # funcione sin importar el CWD actual de Django
-        if _pipeline.model and _pipeline.model.checkpoint_path:
-            cp = Path(_pipeline.model.checkpoint_path)
-            if not cp.is_absolute():
-                _pipeline.model.checkpoint_path = str((_CANUTO_ROOT / cp).resolve())
 
-    return _pipeline
+def _get_chat(usuario):
+    """Devuelve el chat de ese usuario y lo crea si es su primera pregunta."""
+    if usuario not in _conversaciones:
+        from src.chat.pipeline import ChatPipeline
+        modelo = _get_modelo()
+        _conversaciones[usuario] = ChatPipeline(modelo, _max_history)
+    return _conversaciones[usuario]
 
 
 def index(request):
-    """Página principal con el widget flotante de CANUTO."""
+    """Pagina de inicio con el widget flotante."""
     return render(request, "normativa/index.html")
 
 
 def chat(request):
-    """Chat en pantalla completa, estilo ChatGPT."""
-    suggested = [
+    """Chat en pantalla completa."""
+    sugeridas = [  # preguntas de ejemplo que aparecen en la bienvenida
         "¿Cuáles son los requisitos de segunda lengua para graduarse?",
         "¿Cómo funciona el fraccionamiento de matrícula?",
         "¿Qué opciones de grado existen en Ciencias Básicas e Ingeniería?",
         "¿Qué debo hacer si tengo una incapacidad médica?",
         "¿Qué establece el reglamento estudiantil de pregrado?",
     ]
-    pipeline = _get_pipeline()
-    model_version = pipeline.model_name if pipeline.model else "sin modelo"
+    modelo = _get_modelo()
     return render(request, "normativa/chat.html", {
-        "suggested_questions": suggested,
-        "model_version": model_version,
+        "suggested_questions": sugeridas,
+        "model_version": modelo.name if modelo else "sin modelo",
     })
 
 
 @csrf_exempt
 @require_POST
 def api_query(request):
-    """Recibe una pregunta y devuelve la respuesta del modelo."""
+    """Recibe la pregunta y devuelve la respuesta del modelo."""
     try:
         data = json.loads(request.body)
-        question = data.get("question", "").strip()
-        if not question:
+        pregunta = data.get("question", "").strip()
+        if not pregunta:
             return JsonResponse({"error": "Pregunta vacía."}, status=400)
 
-        pipeline = _get_pipeline()
-        result = pipeline.query(question)
-        return JsonResponse({"answer": result["answer"]})
-
+        resultado = _get_chat(data.get("user_id", "anonimo")).query(pregunta)
+        return JsonResponse({"answer": resultado["answer"]})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
@@ -85,6 +82,7 @@ def api_query(request):
 @csrf_exempt
 @require_POST
 def api_reset(request):
-    """Reinicia el historial de conversación."""
-    _get_pipeline().reset_history()
+    """Borra el historial de ese usuario para empezar una conversacion nueva."""
+    data = json.loads(request.body or "{}")
+    _get_chat(data.get("user_id", "anonimo")).reset_history()
     return JsonResponse({"status": "ok"})

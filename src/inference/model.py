@@ -1,19 +1,15 @@
-"""Carga un modelo fine-tuneado en formato HuggingFace y genera respuestas."""
-from __future__ import annotations
-
+"""Carga el modelo fine-tuneado y genera las respuestas."""
 from pathlib import Path
 
 
 class FineTunedModel:
-    """Wrapper sobre un checkpoint HuggingFace para inferencia conversacional."""
-
     def __init__(
         self,
         checkpoint_path: str,
         device: str = "cpu",
         max_new_tokens: int = 512,
-        temperature: float = 0.7,
-        top_p: float = 0.9,
+        temperature: float = 0.3,
+        top_p: float = 0.85,
     ):
         self.checkpoint_path = checkpoint_path
         self.device = device
@@ -22,23 +18,21 @@ class FineTunedModel:
         self.top_p = top_p
         self._model = None
         self._tokenizer = None
-        self._loaded = False
 
     def _load(self) -> None:
-        if self._loaded:
+        """Carga el modelo la primera vez que se necesita (tarda y pesa varios GB)."""
+        if self._model is not None:
             return
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         print(f"  Cargando modelo desde: {self.checkpoint_path}")
         ckpt = Path(self.checkpoint_path)
-        # BF16 en GPU (mismo dtype del entrenamiento), FP32 en CPU
         dtype = torch.bfloat16 if self.device != "cpu" else torch.float32
 
-        # Si el checkpoint es un adaptador LoRA (lo que guarda train_gpu.py), se carga
-        # el modelo base y encima el adaptador. En GPU el base va en 4-bit (QLoRA) para
-        # que el 7B/14B quepa en 16 GB. Si es un modelo completo, se carga directo.
         if (ckpt / "adapter_config.json").exists():
+            # Es un adaptador LoRA: se carga el modelo base y encima el adaptador.
+            # En GPU el base va en 4-bit para que el 7B quepa en los 16 GB.
             import json
             from peft import PeftModel
             base_name = json.loads((ckpt / "adapter_config.json").read_text())["base_model_name_or_path"]
@@ -64,6 +58,7 @@ class FineTunedModel:
             self._model = PeftModel.from_pretrained(base, str(ckpt))
             self._tokenizer = AutoTokenizer.from_pretrained(str(ckpt), trust_remote_code=True)
         else:
+            # Es un modelo completo: se carga directo.
             self._tokenizer = AutoTokenizer.from_pretrained(str(ckpt), trust_remote_code=True)
             self._model = AutoModelForCausalLM.from_pretrained(
                 str(ckpt),
@@ -76,32 +71,18 @@ class FineTunedModel:
         if self.device == "cpu":
             self._model = self._model.to("cpu")
         self._model.eval()
-        self._loaded = True
         print("  Modelo listo.")
 
     def is_available(self) -> bool:
-        """Retorna True si hay un checkpoint configurado y existe en disco."""
-        return bool(
-            self.checkpoint_path and Path(self.checkpoint_path).exists()
-        )
-
-    @property
-    def hf_model(self):
-        """Modelo HuggingFace cargado (para métricas como perplejidad en evaluate.py)."""
-        self._load()
-        return self._model
-
-    @property
-    def tokenizer(self):
-        self._load()
-        return self._tokenizer
+        """Indica si el checkpoint existe en disco."""
+        return bool(self.checkpoint_path and Path(self.checkpoint_path).exists())
 
     @property
     def name(self) -> str:
         return Path(self.checkpoint_path).name if self.checkpoint_path else "sin modelo"
 
-    def chat(self, messages: list[dict]) -> str:
-        """Genera respuesta dado un historial de mensajes [{role, content}]."""
+    def chat(self, messages: list) -> str:
+        """Genera la respuesta a partir de la lista de mensajes [{role, content}]."""
         self._load()
         import torch
 
@@ -110,8 +91,8 @@ class FineTunedModel:
             tokenize=False,
             add_generation_prompt=True,
         )
-        target = "cpu" if self.device == "cpu" else "cuda"
-        inputs = self._tokenizer([text], return_tensors="pt").to(target)
+        destino = "cpu" if self.device == "cpu" else "cuda"
+        inputs = self._tokenizer([text], return_tensors="pt").to(destino)
 
         with torch.no_grad():
             outputs = self._model.generate(
@@ -123,9 +104,6 @@ class FineTunedModel:
                 pad_token_id=self._tokenizer.eos_token_id,
             )
 
-        generated = outputs[0][inputs["input_ids"].shape[-1]:]
-        return self._tokenizer.decode(generated, skip_special_tokens=True).strip()
-
-    def generate(self, prompt: str) -> str:
-        """Genera respuesta dado un prompt de texto plano."""
-        return self.chat([{"role": "user", "content": prompt}])
+        # Se recorta el prompt para quedarse solo con lo que genero el modelo.
+        generado = outputs[0][inputs["input_ids"].shape[-1]:]
+        return self._tokenizer.decode(generado, skip_special_tokens=True).strip()

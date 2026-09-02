@@ -1,8 +1,7 @@
 """Divide el dataset en entrenamiento (70%) y prueba (30%).
 
-El 70% se usa para entrenar el modelo y el 30% queda apartado para evaluar
-(scripts/evaluate.py). La division es aleatoria pero con semilla fija, para que
-sea siempre la misma y los experimentos sean comparables.
+El 70% entrena el modelo y el 30% queda apartado para probarlo. La division es
+aleatoria pero con semilla fija, para que siempre salga igual.
 
 Uso:
     python scripts/split_dataset.py
@@ -31,7 +30,6 @@ def main():
     with open(args.dataset, encoding="utf-8") as f:
         data = json.load(f)
 
-    # Mezclar con semilla fija y cortar 70/30
     random.seed(args.seed)
     random.shuffle(data)
     n_test = int(len(data) * args.test_frac)

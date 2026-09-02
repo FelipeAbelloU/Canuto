@@ -15,15 +15,13 @@ data/extracted/
 
 # Notas de trabajo personales (no forman parte del proyecto)
 retomar.txt
+prueba1.txt
+promt inicio.txt
 
-# Dataset y splits (se regeneran con build_dataset.py / split_dataset.py / evaluate.py)
+# Dataset y splits (se regeneran con build_dataset.py y split_dataset.py)
 data/dataset/dataset_alpaca.json
 data/dataset/train.json
 data/dataset/test.json
-data/dataset/resultados_evaluacion.json
-
-# Bitacora de experimentos (se genera al evaluar; vive en la workstation)
-data/bitacora.xlsx
 
 # Cola de OCR para la workstation (se regenera al correr extract_text.py)
 data/_ocr_queue.txt
@@ -35,10 +33,6 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# Variables de entorno
-.env
-.env.local
-
 # Artefactos de descarga HuggingFace
 *.incomplete
 *.lock
@@ -48,12 +42,8 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
-# Logs y resultados de pruebas (se regeneran)
+# Logs
 *.log
-data/test_results.txt
-
-# Vector store (no se usa en este proyecto)
-data/vectorstore/
 
 # IDEs
 .idea/
@@ -66,14 +56,6 @@ memory/
 CLAUDE.md
 notas y ayudas/prompts tesis.txt
 
-# Mockup React (referencia de diseño — código fuente de Figma Make, no es parte del proyecto)
-mockup_chatbot/
-
-# Archivos de error Django subidos por accidente
-RecursionError*.pdf
-
-# Cookies y logs temporales de sesión
-cookies.txt
-srv*.txt
-ui_server*.log
+# Scripts y volcados de trabajo local
 barrido.sh
+cookies.txt

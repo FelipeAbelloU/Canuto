@@ -1,16 +1,15 @@
-"""
-Inicia el servidor CANUTO.
+"""Inicia el servidor web de CANUTO.
 
 Uso:
     python ui/django_chatbot/run.py
-    python ui/django_chatbot/run.py --port 8080
+    python ui/django_chatbot/run.py --port 8001
 """
 import os
 import sys
 import argparse
 from pathlib import Path
 
-# Agrega CANUTO al path para que Django encuentre src.*
+# Agrega la raiz del proyecto al path para que Django encuentre src.*
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -26,15 +25,11 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
 
-    print("=" * 55)
-    print("  CANUTO — Asistente Normativo Unillanos")
-    print("=" * 55)
-    print(f"  URL principal : http://{args.host}:{args.port}/")
-    print(f"  Chat completo : http://{args.host}:{args.port}/chat/")
+    print("CANUTO — Asistente Normativo Unillanos")
+    print(f"  Inicio : http://{args.host}:{args.port}/")
+    print(f"  Chat   : http://{args.host}:{args.port}/chat/")
     print("  Ctrl+C para detener")
-    print()
 
-    # execute_from_command_line inicializa Django correctamente (igual que manage.py)
     from django.core.management import execute_from_command_line
     execute_from_command_line([
         "manage.py",

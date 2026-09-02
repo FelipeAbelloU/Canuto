@@ -4,12 +4,11 @@
 {% block title %}CANUTO — Chat Normativo{% endblock %}
 
 {% block content %}
-<div class="flex h-screen bg-white dark:bg-neutral-950" id="chat-root">
+<div class="flex h-screen bg-white dark:bg-neutral-950">
 
-  <!-- ===================== SIDEBAR ===================== -->
+  <!-- Barra lateral -->
   <aside class="w-64 flex flex-col border-r border-gray-200 dark:border-neutral-800 bg-gray-50 dark:bg-neutral-900 flex-shrink-0">
 
-    <!-- Logo + nombre -->
     <div class="p-4 border-b border-gray-200 dark:border-neutral-800 flex items-center gap-3">
       <img src="{% static 'normativa/garza.png' %}" alt="CANUTO" class="w-9 h-9 rounded-full border border-red-600 p-0.5 bg-white">
       <div>
@@ -18,9 +17,8 @@
       </div>
     </div>
 
-    <!-- Botón nueva conversación -->
     <div class="p-3">
-      <button onclick="newConversation()"
+      <button onclick="nuevaConversacion()"
         class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg
                flex items-center gap-2 transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,12 +28,8 @@
       </button>
     </div>
 
-    <!-- Lista de conversaciones -->
-    <div class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5" id="conv-list">
-      <!-- Se llena dinámicamente con JS -->
-    </div>
+    <div class="flex-1"></div>
 
-    <!-- Toggle tema + enlace widget -->
     <div class="p-3 border-t border-gray-200 dark:border-neutral-800 space-y-2">
       <a href="{% url 'index' %}"
         class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 transition-colors px-2 py-1">
@@ -61,23 +55,18 @@
 
   </aside>
 
-  <!-- ===================== ÁREA DE CHAT ===================== -->
+  <!-- Area del chat -->
   <main class="flex-1 flex flex-col min-w-0">
 
-    <!-- Barra superior -->
     <header class="h-14 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900
                    flex items-center justify-between px-6 flex-shrink-0">
-      <h1 class="font-semibold text-gray-900 dark:text-white text-sm truncate" id="chat-title">
-        Chat Normativo Universitario
-      </h1>
-      <span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0" id="model-version-tag">CANUTO · {{ model_version }}</span>
+      <h1 class="font-semibold text-gray-900 dark:text-white text-sm truncate">Chat Normativo Universitario</h1>
+      <span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">CANUTO · {{ model_version }}</span>
     </header>
 
-    <!-- Mensajes -->
     <div class="flex-1 overflow-y-auto chat-scroll" id="chat-messages">
       <div class="max-w-3xl mx-auto px-6 py-8 space-y-6">
 
-        <!-- Bienvenida (se oculta al primer mensaje) -->
         <div id="welcome-screen" class="text-center py-8">
           <img src="{% static 'normativa/garza.png' %}" alt="CANUTO"
             class="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-red-600 p-1 bg-white">
@@ -85,10 +74,9 @@
           <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">
             Asistente de normativa universitaria de la Universidad de los Llanos.
           </p>
-          <!-- Preguntas sugeridas -->
           <div class="flex flex-wrap justify-center gap-2">
             {% for q in suggested_questions %}
-            <button onclick="sendSuggestion('{{ q }}')"
+            <button onclick="enviarSugerencia('{{ q }}')"
               class="bg-gray-100 dark:bg-neutral-800 hover:bg-red-50 dark:hover:bg-red-900/30
                      text-gray-700 dark:text-gray-300 text-xs px-3 py-2 rounded-lg transition-colors border
                      border-gray-200 dark:border-neutral-700">
@@ -101,7 +89,6 @@
       </div>
     </div>
 
-    <!-- Input -->
     <div class="border-t border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-6 py-4 flex-shrink-0">
       <div class="max-w-3xl mx-auto flex gap-3">
         <input id="chat-input"
@@ -110,8 +97,8 @@
           class="flex-1 border border-gray-300 dark:border-neutral-700 rounded-xl px-4 py-3 text-sm
                  bg-white dark:bg-neutral-800 text-gray-900 dark:text-white
                  placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-          onkeydown="if(event.key==='Enter') chatSend()">
-        <button onclick="chatSend()"
+          onkeydown="if(event.key==='Enter') enviarPregunta()">
+        <button onclick="enviarPregunta()"
           class="bg-red-600 hover:bg-red-700 text-white rounded-xl px-4 py-3 transition-colors flex-shrink-0">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
@@ -126,297 +113,97 @@
 
 {% block extra_scripts %}
 <script>
-  // Estado de conversaciones (se guarda en sessionStorage)
-  let conversations = JSON.parse(sessionStorage.getItem('canuto-convs') || '[]');
-  let currentConvId = null;
+  const contenedor = () => document.getElementById('chat-messages').querySelector('.space-y-6');
 
-  function saveConversations() {
-    sessionStorage.setItem('canuto-convs', JSON.stringify(conversations));
+  // Escapa el texto para que no se interprete como HTML.
+  function escaparHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function renderSidebar() {
-    const list = document.getElementById('conv-list');
-    list.innerHTML = '';
-    conversations.forEach(conv => {
-      const row = document.createElement('div');
-      row.className = `relative group flex items-center rounded-lg text-xs transition-colors
-        ${conv.id === currentConvId
-          ? 'bg-gray-200 dark:bg-neutral-800'
-          : 'hover:bg-gray-100 dark:hover:bg-neutral-800/50'}`;
-      row.innerHTML = `
-        <button class="flex-1 text-left px-3 py-2 flex items-center gap-2 min-w-0
-          ${conv.id === currentConvId
-            ? 'text-gray-900 dark:text-white font-medium'
-            : 'text-gray-600 dark:text-gray-400'}"
-          onclick="loadConversation('${conv.id}')">
-          <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-          </svg>
-          <span class="truncate">${escapeHtml(conv.title)}</span>
-        </button>
-        <div class="relative flex-shrink-0">
-          <button onclick="toggleConvMenu(event, '${conv.id}')"
-            class="p-1.5 mr-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100
-                   text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white
-                   hover:bg-gray-300 dark:hover:bg-neutral-700 transition-all"
-            title="Opciones">
-            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-            </svg>
-          </button>
-          <div id="conv-menu-${conv.id}"
-            class="hidden absolute right-0 top-full z-50 mt-1
-                   bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700
-                   rounded-lg shadow-lg py-1 min-w-[140px]">
-            <button onclick="renameConversation('${conv.id}')"
-              class="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300
-                     hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-              </svg>
-              Renombrar
-            </button>
-            <button onclick="deleteConversation('${conv.id}')"
-              class="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400
-                     hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-              </svg>
-              Eliminar
-            </button>
-          </div>
-        </div>`;
-      list.appendChild(row);
-    });
-  }
-
-  function toggleConvMenu(event, id) {
-    event.stopPropagation();
-    const menu = document.getElementById(`conv-menu-${id}`);
-    const isHidden = menu.classList.contains('hidden');
-    document.querySelectorAll('[id^="conv-menu-"]').forEach(m => m.classList.add('hidden'));
-    if (isHidden) menu.classList.remove('hidden');
-  }
-
-  function renameConversation(id) {
-    document.querySelectorAll('[id^="conv-menu-"]').forEach(m => m.classList.add('hidden'));
-    const conv = conversations.find(c => c.id === id);
-    if (!conv) return;
-    const newName = prompt('Nuevo nombre para la conversación:', conv.title);
-    if (newName && newName.trim()) {
-      conv.title = newName.trim();
-      saveConversations();
-      renderSidebar();
-      if (id === currentConvId)
-        document.getElementById('chat-title').textContent = conv.title;
-    }
-  }
-
-  function deleteConversation(id) {
-    document.querySelectorAll('[id^="conv-menu-"]').forEach(m => m.classList.add('hidden'));
-    const idx = conversations.findIndex(c => c.id === id);
-    if (idx === -1) return;
-    conversations.splice(idx, 1);
-    saveConversations();
-    if (id === currentConvId) {
-      if (conversations.length === 0) newConversation();
-      else loadConversation(conversations[0].id);
-    } else {
-      renderSidebar();
-    }
-  }
-
-  document.addEventListener('click', () => {
-    document.querySelectorAll('[id^="conv-menu-"]').forEach(m => m.classList.add('hidden'));
-  });
-
-  function newConversation() {
-    const id = Date.now().toString();
-    const conv = { id, title: 'Nueva conversación', messages: [] };
-    conversations.unshift(conv);
-    currentConvId = id;
-    saveConversations();
-    renderSidebar();
-    renderMessages();
-    fetch('/api/reset/', { method: 'POST' });
-    document.getElementById('chat-title').textContent = 'Chat Normativo Universitario';
-  }
-
-  function loadConversation(id) {
-    currentConvId = id;
-    const conv = conversations.find(c => c.id === id);
-    renderSidebar();
-    renderMessages();
-    if (conv) document.getElementById('chat-title').textContent = conv.title;
-  }
-
-  function getCurrentConv() {
-    return conversations.find(c => c.id === currentConvId);
-  }
-
-  function renderMessages() {
-    const conv = getCurrentConv();
-    const container = document.getElementById('chat-messages').querySelector('.space-y-6');
-
-    // Limpiar mensajes anteriores (mantener bienvenida)
-    Array.from(container.children).forEach(el => {
-      if (!el.id) el.remove();
-    });
-
-    const welcome = document.getElementById('welcome-screen');
-    if (!conv || conv.messages.length === 0) {
-      welcome.classList.remove('hidden');
-      return;
-    }
-    welcome.classList.add('hidden');
-
-    conv.messages.forEach(msg => addBubble(msg.role, msg.text));
-  }
-
-  function addBubble(role, text) {
-    const conv = getCurrentConv();
-    const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+  // Agrega un globo de mensaje al chat.
+  function agregarMensaje(rol, texto) {
     document.getElementById('welcome-screen').classList.add('hidden');
+    const fila = document.createElement('div');
+    fila.className = 'flex gap-3 ' + (rol === 'user' ? 'justify-end' : 'justify-start');
 
-    const wrap = document.createElement('div');
-    wrap.className = 'flex gap-3 ' + (role === 'user' ? 'justify-end' : 'justify-start');
-
-    if (role === 'assistant') {
-      wrap.innerHTML = `
+    if (rol === 'assistant') {
+      fila.innerHTML = `
         <img src="{% static 'normativa/garza.png' %}" alt="CANUTO"
           class="w-8 h-8 rounded-full flex-shrink-0 mt-1 border border-gray-200 bg-white p-0.5">
         <div class="max-w-2xl bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700
-                    text-gray-900 dark:text-white rounded-2xl px-4 py-3 text-sm" style="white-space:pre-wrap">${escapeHtml(text)}</div>`;
+                    text-gray-900 dark:text-white rounded-2xl px-4 py-3 text-sm" style="white-space:pre-wrap">${escaparHtml(texto)}</div>`;
     } else {
-      wrap.innerHTML = `
-        <div class="max-w-2xl bg-red-600 text-white rounded-2xl px-4 py-3 text-sm" style="white-space:pre-wrap">${escapeHtml(text)}</div>
+      fila.innerHTML = `
+        <div class="max-w-2xl bg-red-600 text-white rounded-2xl px-4 py-3 text-sm" style="white-space:pre-wrap">${escaparHtml(texto)}</div>
         <div class="w-8 h-8 rounded-full bg-gray-300 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 mt-1 text-xs font-bold text-gray-700 dark:text-gray-300">U</div>`;
     }
 
-    container.appendChild(wrap);
+    contenedor().appendChild(fila);
     document.getElementById('chat-messages').scrollTop = 99999;
-    return wrap;
   }
 
-  // Mensajes progresivos para la primera carga del modelo en CPU (~2 min)
-  const LOADING_MESSAGES = [
-    { delay: 0,   text: 'Pensando…' },
-    { delay: 12,  text: 'Procesando tu pregunta…' },
-    { delay: 35,  text: 'Cargando el modelo (primera consulta tarda ~2 min en CPU)…' },
-    { delay: 75,  text: 'Casi listo, el modelo está iniciando por primera vez…' },
-    { delay: 120, text: 'Sigue procesando, por favor espera…' },
-  ];
-  let _loadingTimer = null;
-  let _loadingStart = 0;
-
-  function addTyping() {
-    const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+  // Muestra los tres puntitos mientras el modelo responde.
+  function mostrarEscribiendo() {
     const div = document.createElement('div');
-    div.id = 'typing-indicator';
+    div.id = 'escribiendo';
     div.className = 'flex gap-3 justify-start';
     div.innerHTML = `
       <img src="{% static 'normativa/garza.png' %}" alt="CANUTO"
         class="w-8 h-8 rounded-full flex-shrink-0 mt-1 border border-gray-200 bg-white p-0.5">
       <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-2xl px-4 py-3">
-        <div class="flex items-center gap-2">
-          <div class="flex gap-1">
-            <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
-            <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
-            <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
-          </div>
-          <span id="typing-status" class="text-xs text-gray-400 dark:text-gray-500 ml-1"></span>
+        <div class="flex gap-1">
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+          <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
         </div>
       </div>`;
-    container.appendChild(div);
+    contenedor().appendChild(div);
     document.getElementById('chat-messages').scrollTop = 99999;
-
-    // Actualizar mensaje de estado según tiempo transcurrido
-    _loadingStart = Date.now();
-    clearTimeout(_loadingTimer);
-    function scheduleNext(idx) {
-      if (idx >= LOADING_MESSAGES.length) return;
-      const msg = LOADING_MESSAGES[idx];
-      const elapsed = (Date.now() - _loadingStart) / 1000;
-      const wait = Math.max(0, msg.delay - elapsed) * 1000;
-      _loadingTimer = setTimeout(() => {
-        const el = document.getElementById('typing-status');
-        if (el) el.textContent = msg.text;
-        scheduleNext(idx + 1);
-      }, wait);
-    }
-    scheduleNext(0);
   }
 
-  function removeTyping() {
-    clearTimeout(_loadingTimer);
-    document.getElementById('typing-indicator')?.remove();
-  }
-
-  async function chatSend() {
+  // Envia la pregunta al servidor y muestra la respuesta.
+  async function enviarPregunta() {
     const input = document.getElementById('chat-input');
-    const question = input.value.trim();
-    if (!question) return;
+    const pregunta = input.value.trim();
+    if (!pregunta) return;
 
-    // Si no hay conversación activa, crear una
-    if (!currentConvId) newConversation();
-    const conv = getCurrentConv();
-
-    const sendBtn = document.querySelector('button[onclick="chatSend()"]');
     input.value = '';
     input.disabled = true;
-    if (sendBtn) sendBtn.disabled = true;
-
-    conv.messages.push({ role: 'user', text: question });
-    if (conv.messages.length === 1) {
-      conv.title = question.length > 40 ? question.slice(0, 40) + '...' : question;
-    }
-    saveConversations();
-    addBubble('user', question);
-    addTyping();
-    document.getElementById('chat-title').textContent = conv.title;
-    renderSidebar();
+    agregarMensaje('user', pregunta);
+    mostrarEscribiendo();
 
     try {
       const res = await fetch('/api/query/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question: pregunta, user_id: getUserId() })
       });
-      removeTyping();
       const data = await res.json();
-      let answer;
-      if (!res.ok) {
-        answer = `⚠️ Error del servidor (${res.status}): ${data.error || 'respuesta no disponible.'}`;
-      } else {
-        answer = data.answer || data.error || 'Error al obtener respuesta.';
-      }
-      conv.messages.push({ role: 'assistant', text: answer });
-      saveConversations();
-      addBubble('assistant', answer);
+      document.getElementById('escribiendo')?.remove();
+      agregarMensaje('assistant', data.answer || data.error || 'No se pudo obtener la respuesta.');
     } catch (e) {
-      removeTyping();
-      addBubble('assistant', '⚠️ Error de conexión. Verifica que el servidor esté activo.');
+      document.getElementById('escribiendo')?.remove();
+      agregarMensaje('assistant', 'Error de conexión. Verifica que el servidor esté activo.');
     } finally {
       input.disabled = false;
-      if (sendBtn) sendBtn.disabled = false;
       input.focus();
     }
   }
 
-  function sendSuggestion(text) {
-    document.getElementById('chat-input').value = text;
-    chatSend();
+  function enviarSugerencia(texto) {
+    document.getElementById('chat-input').value = texto;
+    enviarPregunta();
   }
 
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // Limpia la pantalla y borra el historial que guarda el servidor.
+  function nuevaConversacion() {
+    Array.from(contenedor().children).forEach(el => { if (!el.id) el.remove(); });
+    document.getElementById('welcome-screen').classList.remove('hidden');
+    fetch('/api/reset/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: getUserId() })
+    });
   }
-
-  // Inicializar
-  if (conversations.length === 0) newConversation();
-  else { currentConvId = conversations[0].id; renderSidebar(); renderMessages(); }
 </script>
 {% endblock %}

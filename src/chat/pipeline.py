@@ -1,58 +1,33 @@
-"""Pipeline conversacional del asistente normativo.
-Recibe preguntas del usuario y devuelve respuestas del modelo fine-tuneado.
-"""
-from __future__ import annotations
-
+"""Recibe la pregunta del usuario y devuelve la respuesta del modelo."""
 from .history import ConversationHistory
 
-_DEFAULT_SYSTEM = (
-    "Eres un asistente especializado en normativa universitaria de la "
-    "Universidad de los Llanos (Unillanos), Colombia. "
-    "Responde preguntas sobre reglamentos, resoluciones, acuerdos y documentos normativos. "
-    "Responde siempre en español, de manera clara y útil para estudiantes, docentes y administrativos. "
-    "Si no tienes certeza sobre una información, indícalo claramente."
-)
-
-_NO_MODEL_MSG = (
-    "El modelo aún no está disponible.\n\n"
-    "Configura la ruta del checkpoint en `config/config.yaml` bajo `model.checkpoint_path`."
+SIN_MODELO = (
+    "El modelo aun no esta disponible. "
+    "Configura la ruta del checkpoint en config/config.yaml (model.checkpoint_path)."
 )
 
 
 class ChatPipeline:
-    def __init__(
-        self,
-        model=None,
-        system_prompt: str = "",
-        max_history: int = 5,
-    ):
+    def __init__(self, model=None, max_history: int = 5):
         self.model = model
-        self.system_prompt = system_prompt or _DEFAULT_SYSTEM
+        self.max_history = max_history
         self.history = ConversationHistory(max_turns=max_history)
-        self._max_history = max_history
 
     def query(self, question: str) -> dict:
-        """Procesa una pregunta y retorna la respuesta del modelo."""
+        """Responde una pregunta teniendo en cuenta los turnos anteriores."""
         if self.model is None or not self.model.is_available():
-            return {
-                "answer": _NO_MODEL_MSG,
-                "model_used": "sin modelo",
-            }
+            return {"answer": SIN_MODELO, "model_used": "sin modelo"}
 
-        # Construir lista de mensajes: system + historial reciente + pregunta actual
-        messages = [{"role": "system", "content": self.system_prompt}]
-        for turn in self.history.turns[-self._max_history:]:
+        # Se envian los turnos anteriores y al final la pregunta nueva.
+        messages = []
+        for turn in self.history.turns:
             messages.append({"role": "user", "content": turn["user"]})
             messages.append({"role": "assistant", "content": turn["assistant"]})
         messages.append({"role": "user", "content": question})
 
         answer = self.model.chat(messages)
         self.history.add(question, answer)
-
-        return {
-            "answer": answer,
-            "model_used": self.model.name,
-        }
+        return {"answer": answer, "model_used": self.model.name}
 
     def reset_history(self) -> None:
         self.history.clear()
@@ -61,4 +36,4 @@ class ChatPipeline:
     def model_name(self) -> str:
         if self.model and self.model.is_available():
             return self.model.name
-        return "sin modelo (entrenamiento pendiente)"
+        return "sin modelo"
