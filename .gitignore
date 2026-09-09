@@ -13,11 +13,6 @@ PDF/
 # Textos extraídos (se regeneran con scripts/extract_text.py)
 data/extracted/
 
-# Notas de trabajo personales (no forman parte del proyecto)
-retomar.txt
-prueba1.txt
-promt inicio.txt
-
 # Dataset y splits (se regeneran con build_dataset.py y split_dataset.py)
 data/dataset/dataset_alpaca.json
 data/dataset/train.json
@@ -50,11 +45,6 @@ desktop.ini
 
 # Configuración local del editor (rutas específicas de la máquina)
 .claude/
-
-# Notas de trabajo y contexto local — no forman parte del proyecto entregable
-memory/
-CLAUDE.md
-notas y ayudas/prompts tesis.txt
 
 # Scripts y volcados de trabajo local
 barrido.sh

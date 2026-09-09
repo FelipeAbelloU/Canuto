@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 @dataclass
 class ExtractedDocument:
     filename: str
-    filepath: str
     text: str
     pages: int
     method: str
@@ -56,37 +55,37 @@ def _count_pages(path: Path) -> int:
         return 0
 
 
-# Trigrama letra-dígito-letra sin espacios: firma de fuente con ToUnicode roto
-# (sustituye letras por dígitos, p.ej. "dicta11" en vez de "dictan").
+# Trigrama letra-digito-letra sin espacios: firma de fuente con ToUnicode roto
+# (sustituye letras por digitos, p.ej. "dicta11" en vez de "dictan").
 _CORRUPT_TRIGRAM_RE = re.compile(r"[A-Za-zÁÉÍÓÚáéíóúÑñ][0-9]{1,2}[A-Za-zÁÉÍÓÚáéíóúÑñ]")
 
 
 def looks_corrupt(text: str, threshold: int = 6) -> bool:
-    """True si la capa de texto tiene corrupción sistemática de fuente.
+    """True si la capa de texto tiene corrupcion sistematica de fuente.
 
     Solo cuenta trigramas repetidos ≥3 veces, para no confundir ruido disperso
-    de tablas/códigos con una fuente realmente rota (los limpios dan 0).
+    de tablas/codigos con una fuente realmente rota (los limpios dan 0).
     """
     counts = Counter(m.lower() for m in _CORRUPT_TRIGRAM_RE.findall(text))
     return sum(v for v in counts.values() if v >= 3) >= threshold
 
 
 def extract(pdf_path: str | Path) -> ExtractedDocument:
-    """Extrae un PDF digital a Markdown; marca ``corrupt`` si la fuente está rota."""
+    """Extrae un PDF digital a Markdown; marca ``corrupt`` si la fuente esta rota."""
     path = Path(pdf_path)
     text = _try_pymupdf4llm(path)
     method = "pymupdf4llm"
     if not text:
         text, method = _try_pdfplumber(path) or "", "pdfplumber"
     return ExtractedDocument(
-        filename=path.name, filepath=str(path.resolve()),
+        filename=path.name,
         text=text, pages=_count_pages(path), method=method,
         corrupt=looks_corrupt(text),
     )
 
 
 def is_likely_digital(pdf_path: str | Path, sample_pages: int = 3) -> bool:
-    """Heurística: ≥50 caracteres por página en promedio -> es digital."""
+    """Heuristica: ≥50 caracteres por pagina en promedio -> es digital."""
     try:
         import pdfplumber
         with pdfplumber.open(Path(pdf_path)) as pdf:

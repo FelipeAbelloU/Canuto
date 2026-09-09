@@ -1,7 +1,7 @@
 """PDF -> Markdown (.md) estructurado, espejando la ruta del corpus SIRIUS.
 
 Salida: data/extracted/<año>/<TIPO>/<n>_<año>.md, con frontmatter YAML y la
-estructura legal en encabezados (CONSIDERANDO/RESUELVE ##, ARTÍCULO ###, PARÁGRAFO ####).
+estructura legal en encabezados (CONSIDERANDO/RESUELVE ##, ARTICULO ###, PARAGRAFO ####).
 
     python scripts/extract_text.py                        # solo digitales (escaneados -> cola OCR)
     python scripts/extract_text.py --ocr                  # + OCR docling (workstation con GPU)
@@ -14,10 +14,6 @@ import argparse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Forzar UTF-8 en stdout (Windows muestra � en consola aunque el texto sea correcto)
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from src.config_loader import load_config
 from src.extraction.pdf_digital import extract as extract_digital, is_likely_digital
@@ -108,7 +104,7 @@ def main():
         print(f"  [{rel_display}]")
 
         try:
-            # Detectar el tipo de PDF para decidir qué extractor usar.
+            # Detectar el tipo de PDF para decidir que extractor usar.
             digital = is_likely_digital(pdf_path)
 
             # --- Escaneado: necesita OCR (docling) ---
@@ -128,7 +124,7 @@ def main():
                 doc = extract_digital(pdf_path)
                 method, kind = doc.method, "digital"
 
-                # Fuente rota (letras cambiadas por dígitos): ningún extractor de texto
+                # Fuente rota (letras cambiadas por digitos): ningun extractor de texto
                 # lo arregla -> se manda a OCR con docling.
                 if doc.corrupt:
                     if args.ocr:
@@ -140,15 +136,15 @@ def main():
                         stats["corrupto_omitido"] += 1
                         ocr_queue.append(rel_display)
                         continue
-                # Era 'digital' pero salió vacío: intentar OCR si está habilitado.
+                # Era 'digital' pero salio vacio: intentar OCR si esta habilitado.
                 elif doc.is_empty() and args.ocr:
                     print("    texto vacío -> intentando OCR...")
                     doc = extract_scanned(pdf_path)
                     method, kind = doc.method, "ocr"
 
             if doc.is_empty():
-                # Clasificado como digital pero sin texto real extraíble (capa de texto
-                # vacía). No es un error: se desvía a OCR como los escaneados.
+                # Clasificado como digital pero sin texto real extraible (capa de texto
+                # vacia). No es un error: se desvia a OCR como los escaneados.
                 print("    sin texto extraíble -> a cola de OCR")
                 stats["vacio_a_ocr"] += 1
                 ocr_queue.append(rel_display)

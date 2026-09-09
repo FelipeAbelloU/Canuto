@@ -35,27 +35,27 @@ _SKIP_TYPES = {
 
 
 def _skip_type(tipo: str) -> bool:
-    # Estos tipos son tablas: el texto plano no produce preguntas útiles.
+    # Estos tipos son tablas: el texto plano no produce preguntas utiles.
     return tipo in _SKIP_TYPES
 
 
 # ---------------------------------------------------------------------------
-# Concordancia gramatical según el tipo (la Resolución / el Acuerdo)
+# Concordancia gramatical segun el tipo (la Resolucion / el Acuerdo)
 # ---------------------------------------------------------------------------
 def _gender(tipo_legible: str) -> tuple[str, str, str]:
-    """Devuelve (artículo, artículo_mayúscula, contracción) para el tipo.
+    """Devuelve (articulo, articulo_mayuscula, contraccion) para el tipo.
 
-    'la Resolución / La / de la'  ·  'el Acuerdo / El / del'
+    'la Resolucion / La / de la'  ·  'el Acuerdo / El / del'
     """
     t = tipo_legible.lower()
-    # Acta es femenino pero lleva artículo masculino ("el acta", "del acta").
+    # Acta es femenino pero lleva articulo masculino ("el acta", "del acta").
     if t.startswith(("acuerdo", "decreto", "acta", "documento", "reglamento", "plan")):
         return ("el", "El", "del")
     return ("la", "La", "de la")
 
 
-# Tipos que son legislación NACIONAL, no normativa propia de Unillanos:
-# se citan sin "de Unillanos" para no atribuirle autoría equivocada.
+# Tipos que son legislacion NACIONAL, no normativa propia de Unillanos:
+# se citan sin "de Unillanos" para no atribuirle autoria equivocada.
 _NATIONAL_HINTS = ("NACIONAL", "MINISTERIO", "_MEN", "CONPES", "LEY", "ORDENANZA", "CESU")
 
 
@@ -64,7 +64,7 @@ def _is_national(tipo: str) -> bool:
     return u == "LEY" or any(h in u for h in _NATIONAL_HINTS)
 
 
-# Un número de artículo válido: arábigo, romano u ordinal escrito.
+# Un numero de articulo valido: arabigo, romano u ordinal escrito.
 _ROMAN_RE = re.compile(r"^[IVXLCDM]+$", re.IGNORECASE)
 _ORDINAL_WORDS = {
     "primero", "segundo", "tercero", "cuarto", "quinto", "sexto", "séptimo",
@@ -73,7 +73,7 @@ _ORDINAL_WORDS = {
 
 
 def _valid_num(n: str) -> str:
-    """Devuelve el número si es válido (arábigo/romano/ordinal), o '' si no."""
+    """Devuelve el numero si es valido (arabigo/romano/ordinal), o '' si no."""
     n = n.strip()
     if re.fullmatch(r"\d{1,3}", n):
         return n
@@ -96,44 +96,44 @@ _PAR_RE = re.compile(r"^####\s+PAR[AÁ]GRAFO\s*(.*)$", re.IGNORECASE)
 class DocStructure:
     descripcion: str = ""                       # el "Por la cual…" del encabezado
     considerando: str = ""                      # texto bajo ## CONSIDERANDO
-    resuelve: str = ""                           # texto bajo ## RESUELVE antes del 1er artículo
-    articles: list[tuple[str, str]] = field(default_factory=list)      # (número, contenido)
+    resuelve: str = ""                           # texto bajo ## RESUELVE antes del 1er articulo
+    articles: list[tuple[str, str]] = field(default_factory=list)      # (numero, contenido)
 
 
 def _join(lines: list[str]) -> str:
-    # Une las líneas de un bloque en un párrafo limpio.
+    # Une las lineas de un bloque en un parrafo limpio.
     return re.sub(r"\s+", " ", " ".join(lines)).strip()
 
 
 def _clean_art_num(raw: str) -> str:
-    # Limpia el número del encabezado "### ARTÍCULO 5°." -> "5".
+    # Limpia el numero del encabezado "### ARTICULO 5°." -> "5".
     return raw.strip().strip(".:°º-–) ").strip()
 
 
 def _parse_structure(body_md: str) -> DocStructure:
-    """Recorre el Markdown por encabezados y separa encabezado, secciones y artículos."""
+    """Recorre el Markdown por encabezados y separa encabezado, secciones y articulos."""
     lines = body_md.splitlines()
 
     header: list[str] = []          # texto antes del primer ##
     sections: dict[str, list[str]] = {}
-    articles: list[list] = []       # [num, [líneas]]
-    target = header                 # dónde se acumulan las líneas de contenido actuales
+    articles: list[list] = []       # [num, [lineas]]
+    target = header                 # donde se acumulan las lineas de contenido actuales
 
     for raw in lines:
         s = raw.rstrip()
 
-        # Título del documento (# ...): se ignora, ya está en el frontmatter.
+        # Titulo del documento (# ...): se ignora, ya esta en el frontmatter.
         if s.startswith("# ") and not s.startswith("## "):
             continue
 
-        # Artículo (### ARTÍCULO N) -> nuevo bloque de artículo.
+        # Articulo (### ARTICULO N) -> nuevo bloque de articulo.
         m_art = _ART_RE.match(s)
         if m_art:
             articles.append([_clean_art_num(m_art.group(1)), []])
             target = articles[-1][1]
             continue
 
-        # Parágrafo (#### PARÁGRAFO): pertenece al artículo actual, así que su
+        # Paragrafo (#### PARAGRAFO): pertenece al articulo actual, asi que su
         # contenido se pliega dentro del bloque vigente con una etiqueta.
         m_par = _PAR_RE.match(s)
         if m_par:
@@ -141,7 +141,7 @@ def _parse_structure(body_md: str) -> DocStructure:
             target.append(f"Parágrafo{(' ' + num_par) if num_par else ''}:")
             continue
 
-        # Sección (## CONSIDERANDO / RESUELVE / CAPÍTULO ...).
+        # Seccion (## CONSIDERANDO / RESUELVE / CAPITULO ...).
         m_h2 = _H2_RE.match(s)
         if m_h2 and not s.startswith("### "):
             name = m_h2.group(1).strip().upper()
@@ -149,7 +149,7 @@ def _parse_structure(body_md: str) -> DocStructure:
             target = sections[name]
             continue
 
-        # Línea de contenido normal.
+        # Linea de contenido normal.
         target.append(s)
 
     st = DocStructure()
@@ -190,10 +190,10 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
     """Genera ~max_pairs pares QA fundamentados desde un documento en Markdown.
 
     Estrategia:
-      1. Pregunta(s) general(es) sobre de qué trata el documento.
-      2. Una pregunta por artículo, con el texto real del artículo como respuesta.
-      3. Fallback (documentos sin artículos): usar CONSIDERANDO/RESUELVE.
-    Todas las respuestas citan el documento por su número y año exactos.
+      1. Pregunta(s) general(es) sobre de que trata el documento.
+      2. Una pregunta por articulo, con el texto real del articulo como respuesta.
+      3. Fallback (documentos sin articulos): usar CONSIDERANDO/RESUELVE.
+    Todas las respuestas citan el documento por su numero y año exactos.
     """
     if _skip_type(meta.get("tipo", "")):
         return []
@@ -201,7 +201,7 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
     tipo, cita, _ = _doc_ref(meta)
     la, La, de_la = _gender(tipo)
 
-    # Legislación nacional: se cita sin atribuirla a Unillanos.
+    # Legislacion nacional: se cita sin atribuirla a Unillanos.
     nacional = _is_national(meta.get("tipo", ""))
     suf_q = "" if nacional else " de Unillanos"                       # sufijo de la pregunta
     entidad = "" if nacional else " de la Universidad de los Llanos (Unillanos)"  # en la respuesta
@@ -212,23 +212,23 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
     # ── 1. Preguntas generales ────────────────────────────────────────────
     if st.descripcion:
         intro_ans = f"{La} {cita}{entidad} es la norma «{st.descripcion}»."
-        # Añadir el primer artículo como contexto de lo que dispone.
+        # Añadir el primer articulo como contexto de lo que dispone.
         if st.articles:
             intro_ans += f" En su artículo {st.articles[0][0] or '1'} establece: {st.articles[0][1]}"
         pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans))
         pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
-    # ── 2. Un par por artículo (el núcleo del dataset) ────────────────────
-    # Se garantiza un número ÚNICO por artículo para no crear preguntas
-    # idénticas con respuestas distintas (datos contradictorios).
+    # ── 2. Un par por articulo (el nucleo del dataset) ────────────────────
+    # Se garantiza un numero UNICO por articulo para no crear preguntas
+    # identicas con respuestas distintas (datos contradictorios).
     seen: set[str] = set()
     for idx, (raw_num, content) in enumerate(st.articles, start=1):
         if len(pairs) >= max_pairs - 1:   # dejar sitio para la vigencia
             break
         num = _valid_num(raw_num)
         if not num or num in seen:
-            # Si el número no es válido o se repite: usar el número que
-            # encabeza el contenido ("1. OTORGAR...") o la posición.
+            # Si el numero no es valido o se repite: usar el numero que
+            # encabeza el contenido ("1. OTORGAR...") o la posicion.
             lead = re.match(r"^\s*(\d{1,3})[.\)]", content)
             num = lead.group(1) if (lead and lead.group(1) not in seen) else str(idx)
         if num in seen:
@@ -239,7 +239,7 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
         a = f"Según el artículo {num} {de_la} {cita}{entidad}, se establece: {content}"
         pairs.append(QAPair(q, a))
 
-    # ── 3. Fallback: documentos sin artículos (actas, comunicados) ────────
+    # ── 3. Fallback: documentos sin articulos (actas, comunicados) ────────
     if not st.articles:
         cuerpo = st.resuelve or st.considerando or st.descripcion
         if cuerpo:
@@ -254,7 +254,7 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
                     f"{La} {cita}{entidad} considera: {st.considerando[:1200]}",
                 ))
 
-    # ── 4. Vigencia (si aparece explícita) ────────────────────────────────
+    # ── 4. Vigencia (si aparece explicita) ────────────────────────────────
     vig = re.search(r"(rige\s+a\s+partir[^.\n]{5,160}|entrar[áa]?\s+en\s+vigen[^.\n]{5,160})",
                     body_md, re.IGNORECASE)
     if vig and len(pairs) < max_pairs:

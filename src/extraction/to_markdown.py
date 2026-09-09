@@ -1,7 +1,7 @@
-"""Arma el .md estructurado a partir del texto extraído.
+"""Arma el .md estructurado a partir del texto extraido.
 
-Combina dos fuentes: la metadata de la ruta SIRIUS (tipo/año/número -> frontmatter
-YAML) y la estructura legal del cuerpo (CONSIDERANDO/RESUELVE/ARTÍCULO/PARÁGRAFO),
+Combina dos fuentes: la metadata de la ruta SIRIUS (tipo/año/numero -> frontmatter
+YAML) y la estructura legal del cuerpo (CONSIDERANDO/RESUELVE/ARTICULO/PARAGRAFO),
 que se detecta con regex y se promueve a encabezados (##, ###, ####) para que
 qa_builder pueda recorrerlo por secciones.
 """
@@ -45,7 +45,7 @@ TYPE_LABELS = {
 class DocMeta:
     """Metadata derivada de la ruta del PDF dentro del corpus."""
     doc_type: str          # nombre de la carpeta, ej. "RESOLUCION_SUPERIOR"
-    type_label: str        # legible, ej. "Resolución Superior"
+    type_label: str        # legible, ej. "Resolucion Superior"
     year: str              # ej. "2023"
     number: str            # ej. "7"
     source_filename: str   # ej. "7_2023.pdf"
@@ -53,7 +53,7 @@ class DocMeta:
 
     @property
     def titulo(self) -> str:
-        """Título canónico legible: 'Resolución Superior No. 7 de 2023'."""
+        """Titulo canonico legible: 'Resolucion Superior No. 7 de 2023'."""
         if self.number and self.year:
             return f"{self.type_label} No. {self.number} de {self.year}"
         if self.year:
@@ -77,19 +77,19 @@ def parse_meta_from_path(pdf_path: Path, corpus_root: Path) -> DocMeta:
     doc_type = ""
     if "normatividad" in parts:
         idx = parts.index("normatividad")
-        if idx + 1 < len(parts) - 1:   # debe haber al menos TIPO y archivo después
+        if idx + 1 < len(parts) - 1:   # debe haber al menos TIPO y archivo despues
             doc_type = parts[idx + 1]
     if not doc_type and len(parts) >= 2:
         doc_type = parts[-2]
 
-    # Año: la primera parte de 4 dígitos en la ruta.
+    # Año: la primera parte de 4 digitos en la ruta.
     year = ""
     for part in parts:
         if re.fullmatch(r"(19|20)\d{2}", part):
             year = part
             break
 
-    # Número: lo que precede al primer "_" en el nombre, si es numérico.
+    # Numero: lo que precede al primer "_" en el nombre, si es numerico.
     stem = pdf_path.stem
     number = ""
     m = re.match(r"(\d+)[_\-]", stem)
@@ -110,60 +110,60 @@ def parse_meta_from_path(pdf_path: Path, corpus_root: Path) -> DocMeta:
     )
 
 
-# --- Detección de estructura legal ----------------------------------------
+# --- Deteccion de estructura legal ----------------------------------------
 #
-# La entrada es el Markdown de pymupdf4llm, que trae las líneas DECORADAS
-# (`## **CONSIDERANDO**`, `**Artículo 1º.-OBJETO.**`) y a veces promueve ruido a
-# encabezados. Por eso NO se confía en sus encabezados: se quita la decoración de
-# cada línea y se re-promueve SOLO la estructura legal con estas regex. Las tablas
+# La entrada es el Markdown de pymupdf4llm, que trae las lineas DECORADAS
+# (`## **CONSIDERANDO**`, `**Articulo 1º.-OBJETO.**`) y a veces promueve ruido a
+# encabezados. Por eso NO se confia en sus encabezados: se quita la decoracion de
+# cada linea y se re-promueve SOLO la estructura legal con estas regex. Las tablas
 # se preservan tal cual (es la ventaja de pymupdf4llm frente a pdfplumber).
 
-# Encabezados de sección que aparecen solos en una línea.
+# Encabezados de seccion que aparecen solos en una linea.
 _SECTION_RE = re.compile(
     r"^(CONSIDERANDO|RESUELVE|R\s*E\s*S\s*U\s*E\s*L\s*V\s*E|ACUERDA|DECRETA|RESOLVIÓ|RESOLVIO|"
     r"DISPONE|ORDENA|CERTIFICA|HACE\s+CONSTAR|EN\s+MÉRITO\s+DE\s+LO\s+EXPUESTO)\s*:?\s*$",
     re.IGNORECASE,
 )
 
-# "ARTÍCULO PRIMERO", "ARTÍCULO 8.", "ARTÍCULO 8°", "ART. 12"
+# "ARTICULO PRIMERO", "ARTICULO 8.", "ARTICULO 8°", "ART. 12"
 _ARTICULO_RE = re.compile(
     r"^(ART[IÍ]CULO|ART\.)\s+([A-Za-zÁÉÍÓÚÑ0-9°º]+)\s*[.:\-–)]*\s*(.*)$",
     re.IGNORECASE,
 )
 
-# "PARÁGRAFO", "PARÁGRAFO PRIMERO", "PARÁGRAFO 2"
+# "PARAGRAFO", "PARAGRAFO PRIMERO", "PARAGRAFO 2"
 _PARAGRAFO_RE = re.compile(
     r"^(PAR[AÁ]GRAFO)(\s+[A-Za-zÁÉÍÓÚÑ0-9°º]+)?\s*[.:\-–)]*\s*(.*)$",
     re.IGNORECASE,
 )
 
-# Ruido de pie/encabezado de página: "Página 1 de 2", "Pág. 3"
+# Ruido de pie/encabezado de pagina: "Pagina 1 de 2", "Pag. 3"
 _PAGE_NOISE_RE = re.compile(r"^P[áa]g(?:ina|\.)?\s*\d+\s*(?:de\s*\d+)?$", re.IGNORECASE)
 
-# Banner institucional repetido en cada hoja (se descarta: el título canónico ya
-# viene del frontmatter/metadata). Anclado al INICIO de línea para no borrar texto
-# de cuerpo que mencione "Universidad de los Llanos" (p.ej. dentro de un artículo).
+# Banner institucional repetido en cada hoja (se descarta: el titulo canonico ya
+# viene del frontmatter/metadata). Anclado al INICIO de linea para no borrar texto
+# de cuerpo que mencione "Universidad de los Llanos" (p.ej. dentro de un articulo).
 _BANNER_RE = re.compile(
     r"^UNIVERSIDAD\s+DE\s+LOS\s+LLANOS\b.*(RESOLUCI[ÓO]N|ACUERDO|DECRETO|CONSEJO)"
     r"|^(RESOLUCI[ÓO]N|ACUERDO|DECRETO)\s.{0,75}\bNo?[°º.]?\s*\d+.{0,20}\bDE\s+(19|20)\d{2}\b\)?\.?\s*(\(.*\))?$",
     re.IGNORECASE,
 )
 
-# Línea de fecha suelta tipo "( Mayo 05 )".
+# Linea de fecha suelta tipo "( Mayo 05 )".
 _DATE_LINE_RE = re.compile(r"^\(\s*[A-Za-zÁÉÍÓÚáéíóú]+\.?\s+\d{1,2}\s*\)$")
 
-# Separador de página / regla horizontal que inserta pymupdf4llm.
+# Separador de pagina / regla horizontal que inserta pymupdf4llm.
 _HR_RE = re.compile(r"^-{3,}$")
 
-# Pie de página institucional de Unillanos (dirección, conmutador, correo suelto).
+# Pie de pagina institucional de Unillanos (direccion, conmutador, correo suelto).
 _FOOTER_RE = re.compile(
     r"(Kil[óo]metro\s+\d+\s+V[íi]a\s+a\s+Puerto\s+L[óo]pez|Vereda\s+Barcelona|"
     r"Conmutador\s*\d|^[\w.+-]+@[\w.-]+\.\w+$)",
     re.IGNORECASE,
 )
 
-# "CAPÍTULO I", "TÍTULO II", "CAPITULO PRIMERO" — divisiones del articulado.
-# El ordinal se restringe a romano/ordinal/dígito para no capturar "Título de..." del cuerpo.
+# "CAPITULO I", "TITULO II", "CAPITULO PRIMERO" — divisiones del articulado.
+# El ordinal se restringe a romano/ordinal/digito para no capturar "Titulo de..." del cuerpo.
 _ORDINAL = (r"(?:[IVXLC]+|\d+|PRIMER[OA]?|SEGUND[OA]|TERCER[OA]?|CUART[OA]|QUINT[OA]|"
             r"SEXT[OA]|S[EÉ]PTIM[OA]|OCTAV[OA]|NOVEN[OA]|D[EÉ]CIM[OA])")
 _CAPITULO_RE = re.compile(
@@ -173,13 +173,13 @@ _CAPITULO_RE = re.compile(
 
 
 def _strip_decoration(line: str) -> str:
-    """Quita la decoración Markdown de pymupdf4llm para dejar texto plano."""
+    """Quita la decoracion Markdown de pymupdf4llm para dejar texto plano."""
     s = line.strip()
     s = re.sub(r"<!--.*?-->", "", s)           # comentarios (<!-- image --> de docling)
     s = re.sub(r"^#{1,6}\s*", "", s)          # encabezados ATX
     s = re.sub(r"</?[a-zA-Z][^>]*>", "", s)    # etiquetas HTML (<mark>, <u>, <br>...)
-    s = re.sub(r"[*`]+", "", s)                # negrita/itálica/código
-    s = re.sub(r"_+", " ", s)                  # itálicas con guion bajo
+    s = re.sub(r"[*`]+", "", s)                # negrita/italica/codigo
+    s = re.sub(r"_+", " ", s)                  # italicas con guion bajo
     s = s.replace("\\", " ")                   # backslashes sueltos de pymupdf
     s = re.sub(r"\s+", " ", s).strip()
     return s
@@ -193,13 +193,13 @@ def _normalize_markdown(md: str) -> str:
     """Normaliza el Markdown de pymupdf4llm a estructura legal limpia.
 
     - Preserva bloques de tabla tal cual.
-    - Descarta encabezados-ruido, banners de página, fechas sueltas y reglas.
-    - Deduplica líneas de texto corrido repetidas (subtítulos que se repiten por hoja).
-    - Re-promueve CONSIDERANDO/RESUELVE→##, ARTÍCULO→###, PARÁGRAFO→####.
+    - Descarta encabezados-ruido, banners de pagina, fechas sueltas y reglas.
+    - Deduplica lineas de texto corrido repetidas (subtitulos que se repiten por hoja).
+    - Re-promueve CONSIDERANDO/RESUELVE→##, ARTICULO→###, PARAGRAFO→####.
     """
     raw_lines = md.splitlines()
 
-    # Frecuencia de líneas de texto (sin decoración) para deduplicar repetidos.
+    # Frecuencia de lineas de texto (sin decoracion) para deduplicar repetidos.
     from collections import Counter
     freq: Counter[str] = Counter()
     for raw in raw_lines:
@@ -235,14 +235,14 @@ def _normalize_markdown(md: str) -> str:
                 or _BANNER_RE.search(s) or _FOOTER_RE.search(s)):
             continue
 
-        # Texto corrido repetido (subtítulo por hoja): conservar 1a aparición.
+        # Texto corrido repetido (subtitulo por hoja): conservar 1a aparicion.
         key = s.lower()
         if freq.get(key, 0) >= 2:
             if key in seen_repeat:
                 continue
             seen_repeat.add(key)
 
-        # Promoción de estructura legal.
+        # Promocion de estructura legal.
         m_sec = _SECTION_RE.match(s)
         if m_sec:
             label = re.sub(r"\s+", "", m_sec.group(1)).upper()
@@ -302,7 +302,7 @@ def _yaml_frontmatter(meta: DocMeta, method: str, pages: int, char_count: int) -
 
 
 def to_markdown(text: str, meta: DocMeta, method: str, pages: int) -> str:
-    """Construye el documento Markdown completo: frontmatter + título + cuerpo.
+    """Construye el documento Markdown completo: frontmatter + titulo + cuerpo.
 
     ``text`` es el Markdown crudo de pymupdf4llm (o texto plano de un fallback);
     se normaliza a estructura legal limpia antes de escribirlo.

@@ -1,11 +1,11 @@
-"""Extrae texto de PDFs escaneados (imágenes) usando OCR con docling.
+"""Extrae texto de PDFs escaneados (imagenes) usando OCR con docling.
 
-docling hace el OCR y además reconoce tablas, y entrega el resultado ya en Markdown.
-Necesita GPU para ser práctico a gran escala y un ENTORNO VIRTUAL APARTE, porque sus
+docling hace el OCR y ademas reconoce tablas, y entrega el resultado ya en Markdown.
+Necesita GPU para ser practico a gran escala y un ENTORNO VIRTUAL APARTE, porque sus
 dependencias chocan con las del stack de entrenamiento/inferencia. Ver
 ``requirements-docling.txt``.
 
-El import de docling es diferido: importar este módulo no falla en la laptop sin
+El import de docling es diferido: importar este modulo no falla en la laptop sin
 docling; solo falla si se llama a ``extract()`` sin docling instalado.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from .pdf_digital import ExtractedDocument
 
 
 def _count_pages(path: Path) -> int:
-    # Cuenta las páginas del PDF (solo para el reporte; no afecta al OCR).
+    # Cuenta las paginas del PDF (solo para el reporte; no afecta al OCR).
     try:
         import pymupdf
         with pymupdf.open(str(path)) as doc:
@@ -28,7 +28,7 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
     """Convierte un PDF escaneado a Markdown usando el OCR de docling."""
     path = Path(pdf_path)
 
-    # Import diferido: docling solo se necesita en la máquina que corre el OCR.
+    # Import diferido: docling solo se necesita en la maquina que corre el OCR.
     try:
         from docling.document_converter import DocumentConverter
     except ImportError:
@@ -47,7 +47,6 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
 
     return ExtractedDocument(
         filename=path.name,
-        filepath=str(path.resolve()),
         text=text,
         pages=_count_pages(path),
         method="docling",

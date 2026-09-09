@@ -2,7 +2,7 @@
 
 Uso:
     python ui/django_chatbot/run.py
-    python ui/django_chatbot/run.py --port 8001
+    python ui/django_chatbot/run.py --port 8002
 """
 import os
 import sys
@@ -21,7 +21,8 @@ os.chdir(Path(__file__).parent)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000)
+    # 8001 y no 8000: en la workstation el 8000 lo ocupa otro servicio.
+    parser.add_argument("--port", type=int, default=8001)
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
 

@@ -10,8 +10,11 @@ if str(CANUTO_ROOT) not in sys.path:
 
 SECRET_KEY = "canuto-dev-key-cambiar-en-produccion"
 
+# Servidor de desarrollo: con DEBUG en True runserver sirve las imagenes y el CSS.
+# Si algun dia se publica en internet hay que poner False y servir los estaticos aparte.
 DEBUG = True
 
+# Abierto para poder abrir la pagina desde otro equipo de la red del laboratorio.
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
