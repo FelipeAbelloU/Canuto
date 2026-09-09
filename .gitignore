@@ -43,9 +43,6 @@ desktop.ini
 # IDEs
 .idea/
 
-# Configuración local del editor (rutas específicas de la máquina)
-.claude/
-
 # Scripts y volcados de trabajo local
 barrido.sh
 cookies.txt
