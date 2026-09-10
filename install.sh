@@ -19,4 +19,10 @@ pip install -r requirements.txt
 # Comprobacion rapida de que la GPU se ve
 python -c "import torch; print('CUDA disponible:', torch.cuda.is_available())"
 
+# transformers tiene que quedarse en la version fijada: sentence-transformers y
+# bert-score la pueden arrastrar hacia arriba y romper la compatibilidad con trl.
+python -c "import transformers; print('transformers:', transformers.__version__, '(debe ser 4.46.3)')"
+
+echo
 echo "Listo. Activar con: source venv/bin/activate"
+echo "Falta una sola vez en esta maquina: wandb login"

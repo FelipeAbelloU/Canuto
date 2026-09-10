@@ -78,6 +78,17 @@ class FineTunedModel:
         return bool(self.checkpoint_path and Path(self.checkpoint_path).exists())
 
     @property
+    def hf_model(self):
+        """El modelo de HuggingFace, para hacer forward pass directo (perplejidad)."""
+        self._load()
+        return self._model
+
+    @property
+    def tokenizer(self):
+        self._load()
+        return self._tokenizer
+
+    @property
     def name(self) -> str:
         return Path(self.checkpoint_path).name if self.checkpoint_path else "sin modelo"
 
@@ -94,14 +105,19 @@ class FineTunedModel:
         destino = "cpu" if self.device == "cpu" else "cuda"
         inputs = self._tokenizer([text], return_tensors="pt").to(destino)
 
+        # Con temperatura 0 la generacion es greedy: no se pasan temperature ni
+        # top_p porque no aplican y transformers protesta si van en cero.
+        opciones = {"do_sample": self.temperature > 0}
+        if opciones["do_sample"]:
+            opciones["temperature"] = self.temperature
+            opciones["top_p"] = self.top_p
+
         with torch.no_grad():
             outputs = self._model.generate(
                 **inputs,
                 max_new_tokens=self.max_new_tokens,
-                temperature=self.temperature,
-                top_p=self.top_p,
-                do_sample=self.temperature > 0,
                 pad_token_id=self._tokenizer.eos_token_id,
+                **opciones,
             )
 
         # Se recorta el prompt para quedarse solo con lo que genero el modelo.

@@ -18,8 +18,14 @@ data/dataset/dataset_alpaca.json
 data/dataset/train.json
 data/dataset/test.json
 
+# Respuestas generadas y metricas de cada corrida (salida de evaluate.py)
+data/eval/
+
 # Cola de OCR para la workstation (se regenera al correr extract_text.py)
 data/_ocr_queue.txt
+
+# Registro local de W&B (las corridas viven en wandb.ai)
+wandb/
 
 # Cache de Python
 __pycache__/

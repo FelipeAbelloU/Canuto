@@ -4,10 +4,14 @@ from .chat.pipeline import ChatPipeline
 from .inference.model import FineTunedModel
 
 
-def create_model(config: dict):
-    """Crea el modelo de inferencia. Devuelve None si no hay checkpoint configurado."""
+def create_model(config: dict, checkpoint: str = None):
+    """Crea el modelo de inferencia. Devuelve None si no hay checkpoint configurado.
+
+    Con `checkpoint` se evalua una carpeta concreta sin tocar config.yaml
+    (lo usa scripts/evaluate.py para comparar varias corridas).
+    """
     cfg = config.get("model", {})
-    checkpoint = cfg.get("checkpoint_path", "").strip()
+    checkpoint = (checkpoint or cfg.get("checkpoint_path", "")).strip()
     if not checkpoint:
         return None
 
