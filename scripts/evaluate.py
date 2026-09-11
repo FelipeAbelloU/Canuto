@@ -121,6 +121,14 @@ def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device):
     return nll, entropia
 
 
+def guardar(ruta, datos):
+    """Escribe el archivo de respuestas. Se llama dos veces: apenas terminan las
+    generaciones y otra vez con la perdida ya calculada."""
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)
+
+
 def generar(ruta_salida, checkpoint, config, test, fuera, limite):
     """Genera las respuestas del modelo y las guarda en un JSON."""
     modelo = create_model(config, checkpoint=checkpoint)
@@ -142,15 +150,6 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
         print(f"  {i}/{len(test)}", end="\r")
     print()
 
-    print("Calculando perdida y entropia...")
-    for i, caso in enumerate(casos, 1):
-        nll, ent = perdida_entropia(modelo.hf_model, modelo.tokenizer,
-                                    caso["pregunta"], caso["referencia"], modelo.device)
-        caso["perdida"] = nll
-        caso["entropia"] = ent
-        print(f"  {i}/{len(casos)}", end="\r")
-    print()
-
     print(f"Generando respuestas de {len(fuera)} preguntas fuera de dominio...")
     casos_fuera = []
     for i, pregunta in enumerate(fuera, 1):
@@ -169,10 +168,24 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
         "casos": casos,
         "fuera_dominio": casos_fuera,
     }
-    ruta_salida.parent.mkdir(parents=True, exist_ok=True)
-    with open(ruta_salida, "w", encoding="utf-8") as f:
-        json.dump(datos, f, ensure_ascii=False, indent=2)
+
+    # Se guarda apenas terminan las generaciones, que es lo caro. El calculo de
+    # la perdida viene despues y la tarjeta es compartida: si algo falla ahi, el
+    # archivo ya esta en disco y no se pierde media hora de GPU. Se vuelve a
+    # guardar al final, ya con la perdida y la entropia de cada caso.
+    guardar(ruta_salida, datos)
     print(f"Respuestas guardadas en: {ruta_salida}")
+
+    print("Calculando perdida y entropia...")
+    for i, caso in enumerate(casos, 1):
+        nll, ent = perdida_entropia(modelo.hf_model, modelo.tokenizer,
+                                    caso["pregunta"], caso["referencia"], modelo.device)
+        caso["perdida"] = nll
+        caso["entropia"] = ent
+        print(f"  {i}/{len(casos)}", end="\r")
+    print()
+
+    guardar(ruta_salida, datos)
 
     # Se suelta el 7B antes de medir: BERTScore y los embeddings cargan sus
     # propios modelos y en 16 GB compartidos no caben los tres a la vez.
@@ -475,6 +488,15 @@ def main():
             print(f"\nOJO: ese archivo se genero con --limit {pedido_antes} y estas "
                   f"pidiendo {args.limit}.")
             print("Corre con --regenerar (o borralo) para no mezclar corridas.")
+            sys.exit(1)
+        # El archivo se guarda dos veces (ver generar): si la corrida se cayo
+        # entre las dos, las generaciones estan pero la perdida no. Se avisa en
+        # vez de reventar con un KeyError al medir.
+        if datos["casos"] and "perdida" not in datos["casos"][0]:
+            print("\nOJO: ese archivo quedo a medias (tiene las respuestas pero no la "
+                  "perdida).")
+            print("La corrida anterior se corto al calcular la perdida. Corre con "
+                  "--regenerar.")
             sys.exit(1)
     else:
         with open(args.test, encoding="utf-8") as f:

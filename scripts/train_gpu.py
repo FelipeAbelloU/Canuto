@@ -10,7 +10,7 @@ sobrescribir un checkpoint por error.
 
 Antes de correr:
     export HF_HOME=/bodega/hf-cache   # cache de modelos en el disco grande
-    wandb login                       # una sola vez por maquina
+    wandb login                       # una sola vez al inicio de todo el proceso
     export WANDB_MODE=offline         # solo si la red del laboratorio falla
 
 Uso:
