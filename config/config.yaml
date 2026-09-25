@@ -1,11 +1,18 @@
 # Configuracion de CANUTO — asistente normativo de la Universidad de los Llanos.
-
 # Modelo fine-tuneado que responde las preguntas.
+
 model:
-  # Carpeta del adaptador LoRA. Se llena despues de entrenar,
-  # con la carpeta que pasaste en --output a scripts/train_gpu.py.
-  checkpoint_path: ""
+  # Carpeta del adaptador LoRA que usan el chat y la web. Se llena despues de
+  # entrenar, con la carpeta que creo scripts/train_gpu.py (el nombre lo arma
+  # solo a partir de los hiperparametros), por ejemplo:
+  #   data/checkpoints/t2_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
+  # Vacio = no hay modelo cargado. scripts/evaluate.py no lo necesita: recibe la
+  # carpeta por --checkpoint, para poder medir varias corridas sin tocar esto.
+  checkpoint_path: ""    #IMPORTANTE 
   device: cuda
+  # OJO: estos tres NO afectan la evaluacion. evaluate.py fija los suyos por
+  # dentro (greedy, 512 tokens) para que la corrida 1 y la 15 sean comparables
+  # aunque aqui se cambien para chatear.
   max_new_tokens: 512
   temperature: 0.3
   top_p: 0.85
