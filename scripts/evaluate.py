@@ -54,15 +54,47 @@ MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
 # aproximacion por palabras clave, no un clasificador: una respuesta como "no
 # tengo datos, pero la Resolucion 99 de 2005 dice..." cuenta como NO alucinada.
 # Hay que decirlo asi de claro en el documento.
+#
+# El segundo bloque lo agregue despues de leer a mano las 30 respuestas de la
+# corrida 1: la lista original se perdia dos abstenciones legitimas. La #15
+# contestaba "puede variar... visite la pagina oficial... pongase en contacto"
+# y la #22 "No se ha establecido un numero de telefono". Las dos reconocen que
+# no saben, solo que con otras palabras.
 FRASES_NO_SE = [
     "no tengo", "no dispongo", "no cuento con", "no encuentro", "no aparece",
     "no está en", "no se encuentra", "no hay información", "no tengo información",
     "no tengo certeza", "no forma parte", "no puedo", "no está disponible",
     "no corresponde", "fuera de mi", "no existe", "no figura", "no consta",
+    # agregadas tras la revision manual de la corrida 1
+    "no se ha establecido", "no está especificado", "no se especifica",
+    "no tengo acceso", "no se ha definido", "no se menciona",
+    "puede variar", "podría variar", "puede cambiar",
+    "página oficial", "sitio web oficial", "página web de",
+    "póngase en contacto", "ponerse en contacto", "comuníquese con",
+    "te recomiendo consultar", "le recomiendo consultar", "recomiendo verificar",
+    "consultar directamente", "verificar directamente", "contactar directamente",
 ]
 
-# Cita de un documento: "No. 10 de 2015", "N° 007 de 1990", "10 de 2015"
+# Citas de documentos. Son dos patrones porque hay dos formas de escribirlas:
+#
+#   1. Con "No." delante: "No. 10 de 2015", "N° 007 de 1990".
+#   2. Sin "No.": "Acuerdo Superior 015 de 2018". Aqui hace falta exigir el
+#      tipo de documento delante, porque si no cualquier "2 de 2023" suelto en
+#      medio de una frase contaria como cita.
+#
+# Antes solo estaba el primero, y el comentario decia que reconocia tambien el
+# segundo caso, que no era verdad: las citas sin "No." quedaban invisibles y el
+# denominador de la metrica salia mas bajo de lo real.
 CITA_RE = re.compile(r"N[°ºo\.]*\s*0*(\d{1,4})\s+de\s+(\d{4})", re.IGNORECASE)
+TIPOS_DOC = r"acuerdo|resoluci[oó]n|decreto|estatuto|reglamento|circular|ley|acta"
+CITA_SIN_NO_RE = re.compile(
+    rf"(?:{TIPOS_DOC})\s+(?:\w+\s+)?0*(\d{{1,4}})\s+de\s+(\d{{4}})", re.IGNORECASE)
+
+# Los cuatro bloques de preguntas_fuera_dominio.json. Las de conocimiento
+# general son de CONTROL: preguntas que el modelo debe contestar bien (capital
+# de Francia, mundial 2022). Contarlas como alucinacion era un error de
+# definicion -- responder bien no es alucinar -- y por eso van aparte.
+BLOQUE_CONTROL = "conocimiento_general"
 
 
 def parse_args():
@@ -152,9 +184,10 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
 
     print(f"Generando respuestas de {len(fuera)} preguntas fuera de dominio...")
     casos_fuera = []
-    for i, pregunta in enumerate(fuera, 1):
-        respuesta = modelo.chat([{"role": "user", "content": pregunta}])
-        casos_fuera.append({"pregunta": pregunta, "respuesta": respuesta})
+    for i, p in enumerate(fuera, 1):
+        respuesta = modelo.chat([{"role": "user", "content": p["pregunta"]}])
+        casos_fuera.append({"pregunta": p["pregunta"], "bloque": p["bloque"],
+                            "respuesta": respuesta})
         print(f"  {i}/{len(fuera)}", end="\r")
     print()
 
@@ -200,8 +233,13 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
 # --------------------------------------------------------------------------- #
 # Hiperparametros de la corrida (para que la fila del Excel sea completa)
 # --------------------------------------------------------------------------- #
-# Nombre de carpeta que arma train_gpu.py: t1_7b-e3-lr2e4-r16-wd0.0
-NOMBRE_RE = re.compile(r"^t(\d+)_.*-e(\d+)-lr(\d)e(\d)-r(\d+)-wd([\d.]+)$")
+# Nombre de carpeta que arma train_gpu.py:
+#   t2_7b-e6-lr2e4-r16-wd0.01-do0.05-wu0.1
+# El dropout y el warmup entraron al barrido despues, asi que sus dos grupos son
+# opcionales: los checkpoints viejos (t1_7b-e3-lr2e4-r16-wd0.0) siguen leyendose.
+NOMBRE_RE = re.compile(
+    r"^t(\d+)_.*-e(\d+)-lr(\d)e(\d)-r(\d+)-wd([\d.]+)"
+    r"(?:-do([\d.]+))?(?:-wu([\d.]+))?$")
 
 
 def hiperparametros(carpeta):
@@ -242,6 +280,10 @@ def hiperparametros(carpeta):
             "rank": int(m.group(5)),
             "weight_decay": float(m.group(6)),
         }
+        if m.group(7) is not None:
+            del_nombre["lora_dropout"] = float(m.group(7))
+        if m.group(8) is not None:
+            del_nombre["warmup_ratio"] = float(m.group(8))
         for k, v in del_nombre.items():
             datos.setdefault(k, v)
 
@@ -252,8 +294,13 @@ def hiperparametros(carpeta):
 # Paso 2: metricas (solo texto, no necesitan el modelo)
 # --------------------------------------------------------------------------- #
 def citas(texto):
-    """Conjunto de citas (numero, anio) que aparecen en un texto."""
-    return {(n.lstrip("0") or "0", a) for n, a in CITA_RE.findall(texto)}
+    """Conjunto de citas (numero, anio) que aparecen en un texto.
+
+    Se quitan los ceros de la izquierda para que "007 de 1990" y "7 de 1990"
+    cuenten como la misma cita.
+    """
+    encontradas = CITA_RE.findall(texto) + CITA_SIN_NO_RE.findall(texto)
+    return {(n.lstrip("0") or "0", a) for n, a in encontradas}
 
 
 def exactitud_citas(casos):
@@ -276,11 +323,77 @@ def reconoce_no_saber(texto):
 
 def tasa_alucinacion(casos_fuera):
     """Sobre preguntas de cosas que NO estan en el corpus: que fraccion contesta
-    como si supiera, en vez de reconocer que no tiene la informacion."""
-    if not casos_fuera:
+    como si supiera, en vez de reconocer que no tiene la informacion.
+
+    Las de conocimiento general NO cuentan aqui. Son preguntas de control cuya
+    respuesta correcta SI existe ("Paris es la capital de Francia"): contestarlas
+    bien es lo que se espera, no una alucinacion. Antes entraban al denominador
+    y empujaban la tasa hacia arriba sin motivo.
+    """
+    evaluables = [c for c in casos_fuera if c.get("bloque") != BLOQUE_CONTROL]
+    if not evaluables:
         return 0.0
-    alucina = sum(0 if reconoce_no_saber(c["respuesta"]) else 1 for c in casos_fuera)
-    return alucina / len(casos_fuera)
+    alucina = sum(0 if reconoce_no_saber(c["respuesta"]) else 1 for c in evaluables)
+    return alucina / len(evaluables)
+
+
+def alucinacion_por_bloque(casos_fuera):
+    """La misma tasa, separada por tipo de pregunta.
+
+    Sirve para ver DONDE falla: no es lo mismo inventarse una norma de Unillanos
+    que no existe que confundirse con otra universidad.
+    """
+    por_bloque = {}
+    for c in casos_fuera:
+        bloque = c.get("bloque", "sin_bloque")
+        if bloque == BLOQUE_CONTROL:
+            continue
+        total, alucina = por_bloque.get(bloque, (0, 0))
+        por_bloque[bloque] = (total + 1,
+                              alucina + (0 if reconoce_no_saber(c["respuesta"]) else 1))
+    return {b: round(a / t, 4) for b, (t, a) in sorted(por_bloque.items())}
+
+
+def tasa_abstencion(casos_fuera):
+    """El complemento de la tasa de alucinacion: cuantas veces reconoce que no
+    sabe. Es una de las dos accuracies reales del proyecto."""
+    return round(1 - tasa_alucinacion(casos_fuera), 4)
+
+
+def repeticion_ngramas(texto, n=4):
+    """Que fraccion de los grupos de n palabras seguidas esta repetida.
+
+    Caza el texto degenerado, que es cuando el modelo entra en bucle y repite
+    la misma frase una y otra vez. Ninguna de las otras metricas lo detecta de
+    frente: la entropia baja apenas lo insinua. 0 = nada repetido.
+    """
+    tokens = texto.lower().split()
+    grupos = ngramas(tokens, n)
+    if not grupos:
+        return 0.0
+    return 1 - len(set(grupos)) / len(grupos)
+
+
+def razon_longitud(respuesta, referencia):
+    """Largo de la respuesta dividido por el largo de la referencia.
+
+    1.0 es lo ideal. Muy por debajo = se corto o no contesto; muy por encima =
+    se fue por las ramas o entro en bucle. Se reporta la MEDIANA porque unos
+    pocos casos extremos arrastrarian el promedio.
+    """
+    if not referencia.strip():
+        return 0.0
+    return len(respuesta.split()) / len(referencia.split())
+
+
+def mediana(valores):
+    ordenados = sorted(valores)
+    n = len(ordenados)
+    if n == 0:
+        return 0.0
+    if n % 2:
+        return ordenados[n // 2]
+    return (ordenados[n // 2 - 1] + ordenados[n // 2]) / 2
 
 
 def f1_tokens(pred, ref):
@@ -400,6 +513,10 @@ def calcular_metricas(datos, hp):
     perdida = sum(c["perdida"] for c in casos) / n
     entropia = sum(c["entropia"] for c in casos) / n
 
+    fuera = datos["fuera_dominio"]
+    repeticiones = [repeticion_ngramas(p) for p in preds]
+    razones = [razon_longitud(p, r) for p, r in zip(preds, refs)]
+
     return {
         # --- hiperparametros: lo que TU ajustaste en esta corrida ---
         "n_prueba": hp.get("num_prueba"),
@@ -409,14 +526,17 @@ def calcular_metricas(datos, hp):
         "lora_alpha": hp.get("lora_alpha"),
         "lora_dropout": hp.get("lora_dropout"),
         "weight_decay": hp.get("weight_decay"),
+        "warmup_ratio": hp.get("warmup_ratio"),
         "batch_efectivo": hp.get("batch_efectivo"),
         "seq_len": hp.get("seq_len"),
         # --- identificacion y metricas ---
         "fecha": datos["fecha"],
         "checkpoint": datos["checkpoint"],
         "n_test": n,
+        "n_fuera": len([c for c in fuera if c.get("bloque") != BLOQUE_CONTROL]),
         "exactitud_citas": round(exactitud_citas(casos), 4),
-        "tasa_alucinacion": round(tasa_alucinacion(datos["fuera_dominio"]), 4),
+        "tasa_alucinacion": round(tasa_alucinacion(fuera), 4),
+        "tasa_abstencion": tasa_abstencion(fuera),
         "bertscore_f1": round(bertscore_f1, 4),
         "coseno_sem": round(coseno_semantico(preds, refs), 4),
         "f1_tokens": round(sum(f1_tokens(p, r) for p, r in zip(preds, refs)) / n, 4),
@@ -427,6 +547,11 @@ def calcular_metricas(datos, hp):
         "perplejidad": round(math.exp(perdida), 2),
         "entropia": round(entropia, 4),
         "info_mutua": round(sum(info_mutua(p, r) for p, r in zip(preds, refs)) / n, 4),
+        # --- deteccion de texto degenerado ---
+        "repeticion_4g": round(mediana(repeticiones), 4),
+        "repeticion_altas": sum(1 for x in repeticiones if x > 0.30),
+        "razon_longitud": round(mediana(razones), 4),
+        "longitud_desviada": sum(1 for x in razones if x < 0.5 or x > 2.0),
     }
 
 
@@ -436,27 +561,34 @@ def calcular_metricas(datos, hp):
 # que salio), que es el orden en el que se lee y se ordena la bitacora.
 COLUMNAS_HIPER = [
     "n_prueba", "epocas", "learning_rate", "rank", "lora_alpha",
-    "lora_dropout", "weight_decay", "batch_efectivo", "seq_len",
+    "lora_dropout", "weight_decay", "warmup_ratio", "batch_efectivo", "seq_len",
 ]
 COLUMNAS_METRICAS = [
-    "fecha", "checkpoint", "n_test",
-    "exactitud_citas", "tasa_alucinacion",
+    "fecha", "checkpoint", "n_test", "n_fuera",
+    "exactitud_citas", "tasa_alucinacion", "tasa_abstencion",
     "bertscore_f1", "coseno_sem", "f1_tokens",
     "rouge_l", "bleu", "cider",
     "perdida_test", "perplejidad", "entropia", "info_mutua",
+    "repeticion_4g", "repeticion_altas", "razon_longitud", "longitud_desviada",
 ]
 COLUMNAS = COLUMNAS_HIPER + COLUMNAS_METRICAS
 
 # Valor al que apunta cada metrica, para leer los resultados de un vistazo.
 OBJETIVOS = {
+    "n_fuera": "fuera de dominio SIN las de control",
     "exactitud_citas": "subir, meta > 0.90",
     "tasa_alucinacion": "bajar, meta < 0.30",
+    "tasa_abstencion": "subir = 1 - tasa_alucinacion",
     "bertscore_f1": "0.8-0.9 solido, > 0.9 excelente",
     "coseno_sem": "meta > 0.75",
     "perdida_test": "muy baja = memorizacion",
     "perplejidad": "bajisima = memorizacion, no calidad",
     "entropia": "informativa: baja = seguridad ciega",
     "info_mutua": "informativa, nunca sola",
+    "repeticion_4g": "mediana, bajar. 0 = sin bucles",
+    "repeticion_altas": "cuantas pasan del 30% repetido",
+    "razon_longitud": "mediana, ideal 1.0",
+    "longitud_desviada": "cuantas se desvian mas del doble",
 }
 
 
@@ -492,6 +624,19 @@ def main():
         # El archivo se guarda dos veces (ver generar): si la corrida se cayo
         # entre las dos, las generaciones estan pero la perdida no. Se avisa en
         # vez de reventar con un KeyError al medir.
+        # El set de preguntas fuera de dominio paso de 30 a 100. Un archivo de
+        # respuestas viejo tiene solo las 30 y sin la etiqueta de bloque: las
+        # metricas saldrian calculadas sobre otro conjunto, con toda la pinta de
+        # ser comparables cuando no lo son. Se compara contra el archivo actual.
+        with open(args.fuera_dominio, encoding="utf-8") as f:
+            n_fuera_ahora = len(json.load(f))
+        n_fuera_antes = len(datos.get("fuera_dominio", []))
+        if n_fuera_antes != n_fuera_ahora:
+            print(f"\nOJO: ese archivo se genero con {n_fuera_antes} preguntas fuera "
+                  f"de dominio y ahora hay {n_fuera_ahora}.")
+            print("Corre con --regenerar para medir las dos corridas sobre el mismo "
+                  "conjunto.")
+            sys.exit(1)
         if datos["casos"] and "perdida" not in datos["casos"][0]:
             print("\nOJO: ese archivo quedo a medias (tiene las respuestas pero no la "
                   "perdida).")
@@ -505,6 +650,14 @@ def main():
             test = test[:args.limit]
         with open(args.fuera_dominio, encoding="utf-8") as f:
             fuera = json.load(f)
+        # El archivo paso de ser una lista de textos a una lista de objetos
+        # {pregunta, bloque}. La etiqueta hace falta para separar las preguntas
+        # de control del resto al contar la alucinacion.
+        if fuera and isinstance(fuera[0], str):
+            print("\nOJO: preguntas_fuera_dominio.json esta en el formato viejo "
+                  "(lista de textos).")
+            print('Tiene que ser: [{"pregunta": "...", "bloque": "..."}, ...]')
+            sys.exit(1)
         datos = generar(ruta_respuestas, checkpoint, config, test, fuera, args.limit)
 
     hp = hiperparametros(checkpoint)
@@ -524,6 +677,26 @@ def main():
     for k in COLUMNAS_METRICAS:
         nota = OBJETIVOS.get(k, "")
         print(f"  {k:<18} {resultados[k]}" + (f"   ({nota})" if nota else ""))
+
+    # Donde falla es tan util como cuanto falla: no es lo mismo inventarse una
+    # norma de Unillanos que confundirse con otra universidad.
+    print("\n=== Alucinacion por tipo de pregunta ===")
+    for bloque, tasa in alucinacion_por_bloque(datos["fuera_dominio"]).items():
+        print(f"  {bloque:<24} {tasa}")
+
+    # Las de control no se pueden calificar solas: para saber si "Paris es la
+    # capital de Francia" esta bien hay que leerlo. Se imprimen para revisarlas
+    # a ojo, que son pocas y se hace en un minuto. Si salen todas bien, es la
+    # prueba de que el entrenamiento no borro el conocimiento general.
+    control = [c for c in datos["fuera_dominio"]
+               if c.get("bloque") == BLOQUE_CONTROL]
+    if control:
+        print(f"\n=== Control de conocimiento general ({len(control)}) "
+              f"-- revisar a mano ===")
+        for c in control:
+            respuesta = " ".join(c["respuesta"].split())[:90]
+            print(f"  {c['pregunta']}")
+            print(f"    -> {respuesta}...")
 
     print("\n=== Linea para el Excel (pegar en una fila) ===")
     print("\t".join(COLUMNAS))
