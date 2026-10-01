@@ -1,7 +1,9 @@
 """Genera el dataset de entrenamiento a partir de los .md extraidos.
 
 Lee los .md de data/extracted/ (con su frontmatter) y arma los pares
-pregunta-respuesta en data/dataset/dataset_alpaca.json.
+pregunta-respuesta en data/dataset/dataset_alpaca.json. Ademas de los pares
+normales agrega ejemplos negativos (preguntas cuya respuesta es "no tengo
+informacion"), para que el modelo aprenda a reconocer lo que no sabe.
 
 Uso:
     python scripts/build_dataset.py
@@ -9,6 +11,8 @@ Uso:
 """
 import sys
 import re
+import json
+import random
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -16,8 +20,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import argparse
 from src.config_loader import load_config
 from src.dataset.qa_builder import (
-    generate_heuristic, save_dataset, QAPair
+    generate_heuristic, generate_negatives, generate_generales,
+    cita_key, ultimo_articulo, save_dataset, QAPair
 )
+
+# Semilla fija: los numeros falsos de los negativos salen siempre iguales.
+SEMILLA = 42
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
@@ -72,14 +80,25 @@ def main():
         print(f"Filtro tipos: {', '.join(sorted(types_filter))}")
     print(f"Procesando {len(src_files)} documento(s)...\n")
 
+    # Primera pasada: indice de todos los documentos del corpus con su ultimo
+    # articulo. Con esto los negativos preguntan por cosas que de verdad no
+    # estan en el corpus. Si un documento esta repetido se queda el mayor.
+    docs = []
+    indice: dict = {}
+    for src_path in src_files:
+        meta, body = _split_frontmatter(src_path.read_text(encoding="utf-8"))
+        docs.append((src_path, meta, body))
+        key = cita_key(meta)
+        indice[key] = max(indice.get(key, 0), ultimo_articulo(body))
+    print(f"Indice del corpus: {len(indice)} documentos distintos\n")
+
+    rng = random.Random(SEMILLA)
     all_pairs: list[QAPair] = []
+    negativos: list[QAPair] = []
     by_type: dict[str, int] = {}
     omitidos = 0
 
-    for src_path in src_files:
-        raw = src_path.read_text(encoding="utf-8")
-
-        meta, body = _split_frontmatter(raw)
+    for src_path, meta, body in docs:
         tipo = meta.get("tipo", "")
 
         if types_filter and tipo not in types_filter:
@@ -87,11 +106,27 @@ def main():
             continue
 
         pairs = generate_heuristic(body, meta)
+        negs = generate_negatives(meta, indice, rng)
 
         rel = src_path.relative_to(input_dir).as_posix()
-        print(f"  [{tipo or '—'}] {rel}: {len(pairs)} pares QA")
+        print(f"  [{tipo or '—'}] {rel}: {len(pairs)} pares QA + {len(negs)} negativos")
         by_type[tipo] = by_type.get(tipo, 0) + len(pairs)
         all_pairs.extend(pairs)
+        negativos.extend(negs)
+
+    # Negativos que no salen de ningun documento (otras universidades, datos
+    # privados, cultura general...).
+    with open(root / "data/dataset/preguntas_generales.json", encoding="utf-8") as f:
+        generales = json.load(f)
+    negativos.extend(generate_generales(rng, generales))
+
+    # Ninguna pregunta del examen fuera de dominio puede quedar en el dataset:
+    # si el modelo la ve al entrenar, la tasa de alucinacion sale mejor de lo que es.
+    with open(root / "data/dataset/preguntas_fuera_dominio.json", encoding="utf-8") as f:
+        examen = {p["pregunta"] for p in json.load(f)}
+    negativos = [p for p in negativos if p.question not in examen]
+    n_negativos = len(negativos)
+    all_pairs.extend(negativos)
 
     # El corpus trae documentos duplicados, asi que se quitan las preguntas repetidas.
     seen_q: set[str] = set()
@@ -116,7 +151,8 @@ def main():
     if omitidos:
         print(f"\nDocumentos omitidos por filtro de tipo: {omitidos}")
 
-    print(f"\nTotal: {len(all_pairs)} pares QA en {output_file}")
+    print(f"\nNegativos: {n_negativos} (antes de quitar duplicados)")
+    print(f"Total: {len(all_pairs)} pares QA en {output_file}")
 
 
 if __name__ == "__main__":

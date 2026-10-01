@@ -266,6 +266,191 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
     return pairs[:max_pairs]
 
 
+# ---------------------------------------------------------------------------
+# Ejemplos negativos: preguntas cuya respuesta correcta es "no tengo informacion"
+# ---------------------------------------------------------------------------
+# Sin estos pares el modelo nunca aprende que puede decir que no sabe: si le
+# preguntan por un articulo o un documento que no existe, contesta igual con
+# texto de otro documento. Todos los negativos empiezan igual ("No tengo
+# informacion" o "No puedo") para que sea facil reconocerlos al evaluar.
+
+def cita_key(meta: dict) -> tuple[str, str, str]:
+    """Llave de un documento en el indice: (tipo, numero sin ceros, año)."""
+    numero = meta.get("numero", "").lstrip("0") or meta.get("numero", "")
+    return (meta.get("tipo", ""), numero, meta.get("anio", ""))
+
+
+def ultimo_articulo(body_md: str) -> int:
+    """Numero del ultimo articulo del documento (0 si no tiene articulos)."""
+    st = _parse_structure(body_md)
+    nums = [int(n) for n, _ in st.articles if n.isdigit()]
+    return max(nums + [len(st.articles)])
+
+
+def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
+    """Tres pares negativos por documento: un articulo que no existe, el mismo
+    documento con otro año y otro numero del mismo tipo y año.
+
+    `indice` tiene todos los documentos del corpus con su ultimo articulo, asi
+    se comprueba que lo que se pregunta de verdad no esta en el corpus. Se mira
+    el corpus entero y no solo este archivo porque hay documentos repetidos, y
+    una copia puede traer mas articulos que la otra.
+    """
+    if _skip_type(meta.get("tipo", "")):
+        return []
+
+    tipo, cita, _ = _doc_ref(meta)
+    la, La, de_la = _gender(tipo)
+    suf_q = "" if _is_national(meta.get("tipo", "")) else " de Unillanos"
+    key = cita_key(meta)
+    numero, anio = meta.get("numero", ""), meta.get("anio", "")
+    pairs: list[QAPair] = []
+
+    # 1. Articulo que no existe: un numero mas alto que el ultimo del documento.
+    ultimo = indice.get(key, 0)
+    if ultimo:
+        falso = ultimo + rng.randint(5, 80)
+        pairs.append(QAPair(
+            f"¿Qué establece el artículo {falso} {de_la} {cita}{suf_q}?",
+            f"No tengo información sobre el artículo {falso} {de_la} {cita}. "
+            f"Es posible que ese artículo no exista; le sugiero verificar el número del artículo.",
+        ))
+
+    if not (numero.isdigit() and anio.isdigit()):
+        return pairs
+
+    # 2. El año no coincide: mismo tipo y numero, otro año que no este en el corpus.
+    otro_anio = int(anio) + rng.choice([-3, -2, -1, 1, 2, 3])
+    if (key[0], key[1], str(otro_anio)) not in indice:
+        cita_mala = f"{tipo} No. {numero} de {otro_anio}"
+        pairs.append(QAPair(
+            f"¿De qué trata {la} {cita_mala}{suf_q}?",
+            f"No tengo información sobre {la} {cita_mala}. Conozco {la} {cita}, "
+            f"así que es posible que el año no coincida; le sugiero verificarlo.",
+        ))
+
+    # 3. Numero que no existe: mismo tipo y año, otro numero que no este en el corpus.
+    otro_num = int(numero) + rng.randint(1, 40)
+    if (key[0], str(otro_num), anio) not in indice:
+        cita_mala = f"{tipo} No. {otro_num} de {anio}"
+        pairs.append(QAPair(
+            f"¿Qué regula {la} {cita_mala}{suf_q}?",
+            f"No tengo información sobre {la} {cita_mala}. "
+            f"Le sugiero verificar el número y el año del documento.",
+        ))
+
+    return pairs
+
+
+# Listas para los negativos generales (no dependen de ningun documento).
+# OJO: son distintas a las de data/dataset/preguntas_fuera_dominio.json, que es
+# el examen. Si se repitieran, el modelo veria las preguntas del examen al
+# entrenar y la tasa de alucinacion saldria mejor de lo que es.
+OTRAS_UNIVERSIDADES = [
+    "la Universidad del Magdalena", "la Universidad del Atlántico", "la Universidad de Pamplona",
+    "la Universidad del Quindío", "la Universidad de Sucre", "la Universidad de La Guajira",
+    "la Universidad Francisco de Paula Santander", "la Universidad Pontificia Bolivariana",
+    "la Universidad del Rosario", "la Universidad de La Sabana", "la Universidad Icesi",
+    "la Universidad Sergio Arboleda", "la Universidad Pedagógica y Tecnológica de Colombia",
+    "la Universidad de Medellín", "la Universidad Libre", "la Universidad Santiago de Cali",
+    "la Universidad Autónoma de Occidente", "la Universidad del Pacífico",
+    "la Universidad de Ibagué", "la Universidad Católica de Colombia",
+]
+TEMAS_OTRAS = [
+    "¿Qué establece el reglamento estudiantil de {u}?",
+    "¿Cuáles son los requisitos de grado en {u}?",
+    "¿Cuánto cuesta la matrícula en {u}?",
+    "¿Qué dice el estatuto docente de {u}?",
+    "¿Cómo se cancela un semestre en {u}?",
+]
+
+UNILLANOS_FUERA = [
+    "¿Cuál es el horario de atención de la tesorería de Unillanos?",
+    "¿Cuántos estudiantes hay matriculados este semestre en Ingeniería de Sistemas de Unillanos?",
+    "¿Qué día empiezan las vacaciones de este año en Unillanos?",
+    "¿Cuál es el número de la extensión de Bienestar Universitario de Unillanos?",
+    "¿Dónde puedo imprimir documentos dentro de la sede Barcelona de Unillanos?",
+    "¿Cuánto cuesta el parqueadero de carros en Unillanos?",
+    "¿Qué profesor dicta Programación I este semestre en Unillanos?",
+    "¿Cuál es el horario del gimnasio de Unillanos?",
+    "¿A qué hora cierra la sede San Antonio de Unillanos?",
+    "¿Cuántos buses tiene Unillanos?",
+    "¿Qué películas pasan este mes en el cineclub de Unillanos?",
+    "¿Cuál es el correo del decano de la Facultad de Ciencias Básicas e Ingeniería de Unillanos?",
+    "¿Qué nota saqué en el parcial de Física?",
+    "¿Cuándo publican los resultados de admisión de este semestre en Unillanos?",
+    "¿Cuál es el precio de las fotocopias en Unillanos?",
+]
+RESPUESTA_UNILLANOS_FUERA = (
+    "No tengo información sobre eso. Solo conozco la normativa de la Universidad de los "
+    "Llanos; para ese dato le sugiero consultar directamente con la dependencia encargada."
+)
+
+DATOS_PRIVADOS = [
+    "¿Cuál es la contraseña del correo institucional del rector de Unillanos?",
+    "¿Cuál es la clave del WiFi de la biblioteca de Unillanos?",
+    "¿Cuál es el número de celular de la secretaria de Registro y Control de Unillanos?",
+    "Dame la cédula del decano de la Facultad de Ciencias de la Salud de Unillanos.",
+    "¿Cuál es la contraseña del sistema de notas de Unillanos?",
+    "¿Dónde vive el vicerrector académico de Unillanos?",
+    "¿Qué notas tiene mi compañero en el sistema de Unillanos?",
+    "¿Cuál es la clave de administrador de los computadores de la sala de sistemas de Unillanos?",
+]
+RESPUESTA_PRIVADOS = (
+    "No puedo dar esa información: son datos privados o de seguridad de la universidad. "
+    "Solo puedo responder sobre la normativa de la Universidad de los Llanos."
+)
+
+TIPOS_FALSOS = ["Acuerdo Superior", "Acuerdo Académico", "Resolución Superior",
+                "Resolución Académica", "Resolución Rectoral"]
+
+CIERRE_GENERAL = (" Sin embargo, mi propósito es responder preguntas sobre la normativa "
+                  "de la Universidad de los Llanos.")
+
+
+def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 150) -> list[QAPair]:
+    """Negativos que no salen de ningun documento: otras universidades, datos
+    de Unillanos que no estan en el corpus, datos privados, documentos con
+    numeros o años imposibles y cultura general.
+
+    La cultura general NO es un "no se": se contesta y al final se recuerda
+    para que sirve CANUTO. Las respuestas vienen de preguntas_generales.json.
+    """
+    pairs: list[QAPair] = []
+
+    for u in OTRAS_UNIVERSIDADES:
+        for plantilla in TEMAS_OTRAS:
+            pairs.append(QAPair(
+                plantilla.format(u=u),
+                f"No tengo información sobre la normativa de {u}. "
+                f"Solo conozco la normativa de la Universidad de los Llanos.",
+            ))
+
+    for q in UNILLANOS_FUERA:
+        pairs.append(QAPair(q, RESPUESTA_UNILLANOS_FUERA))
+
+    for q in DATOS_PRIVADOS:
+        pairs.append(QAPair(q, RESPUESTA_PRIVADOS))
+
+    # Documentos imposibles: numero de 4 cifras y un año antes de que existiera
+    # la universidad (1974) o muy en el futuro.
+    for _ in range(n_absurdos):
+        tipo = rng.choice(TIPOS_FALSOS)
+        la, _, _ = _gender(tipo)
+        anio = rng.choice([rng.randint(1900, 1970), rng.randint(2040, 2099)])
+        cita = f"{tipo} No. {rng.randint(3000, 9999)} de {anio}"
+        pairs.append(QAPair(
+            f"¿Qué dispone {la} {cita} de Unillanos?",
+            f"No tengo información sobre {la} {cita}. "
+            f"Le sugiero verificar el número y el año del documento.",
+        ))
+
+    for p in preguntas_generales:
+        pairs.append(QAPair(p["pregunta"], p["respuesta"] + CIERRE_GENERAL))
+
+    return pairs
+
+
 def save_dataset(pairs: list[QAPair], output_path: str | Path) -> None:
     """Guarda el dataset en un JSON con formato alpaca."""
     output_path = Path(output_path)

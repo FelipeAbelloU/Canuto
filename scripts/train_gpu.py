@@ -28,7 +28,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 # HIPERPARAMETROS DE LA CORRIDA  --  editar a mano antes de entrenar
 # ===========================================================================
 NUM_PRUEBA = 2            # numero de prueba: prefijo de la carpeta (t1, t2, ...)
-EPOCAS = 4                # 4, 6, 8   (ver "por que 6 epocas" mas abajo)
+EPOCAS = 4                # 4, 6, 8   (ver "por que mas de 3 epocas" mas abajo)
 LEARNING_RATE = 2e-4      # 1e-4, 2e-4, 3e-4
 LORA_RANK = 16            # 8, 16, 32  (alpha = rank * 2, se deriva solo)
 WEIGHT_DECAY = 0.01       # 0.01, 0.05, 0.1   NUNCA 0 = sin regularizacion
@@ -41,7 +41,7 @@ WARMUP_RATIO = 0.1        # 0.03, 0.1, 0.2    (5-10% de los pasos es lo usual)
 # Orden de prioridad (si falta tiempo, se corren en este orden):
 #   epocas > learning rate > weight decay > lora_dropout > rank > warmup_ratio
 #
-# POR QUE 6 EPOCAS Y NO 3: con 3 epocas la curva de validacion tiene 3 puntos y
+# POR QUE MAS DE 3 EPOCAS: con 3 epocas la curva de validacion tiene 3 puntos y
 # en la corrida 1 seguia BAJANDO en el tercero (0.4520 -> 0.3546 -> 0.3363). El
 # punto de sobreajuste esta despues y nunca se vio. Para ENSEÑAR en una grafica
 # donde se voltea la curva hay que entrenar pasado ese punto: una corrida que no
@@ -70,16 +70,18 @@ LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj",
 # Cada cuantos PASOS se mide la perdida de validacion. Ojo con la direccion:
 # un numero MAS CHICO significa medir MAS seguido, o sea mas tiempo perdido.
 #
-# La cuenta con 9.017 ejemplos y batch efectivo 8 (1.127 pasos por epoca), en
-# una corrida de 4 epocas = 4.508 pasos, a ~1,5 min por medicion:
+# Pasos por epoca = ejemplos de entrenamiento / 8 (el batch efectivo). La cuenta
+# se hizo con el dataset sin negativos (9.017 ejemplos, 1.127 pasos por epoca,
+# 4 epocas) y ~1,5 min por medicion:
 #
-#   cada 100 pasos -> 45 mediciones -> +68 min sobre 4h04 = 28% de recargo
-#   cada 250 pasos -> 18 mediciones -> +27 min             = 11% de recargo
-#   cada 500 pasos ->  9 mediciones -> +14 min             =  6% de recargo
+#   cada 100 pasos -> 45 mediciones -> 28% de tiempo extra
+#   cada 250 pasos -> 18 mediciones -> 11% de tiempo extra
+#   cada 500 pasos ->  9 mediciones ->  6% de tiempo extra
 #
-# Se toma 250: 18 puntos dibujan bien la curva (antes eran 3, uno por epoca) y
-# el recargo queda lejos del 25% que se considera demasiado. Con 100 se pasa de
-# ese limite y los 45 puntos no dicen nada que no digan 18.
+# Se toma 250: la curva queda con bastantes puntos (antes eran 3, uno por epoca)
+# y el tiempo extra queda lejos del 25% que se considera demasiado. Con los
+# negativos el dataset crece y salen mas mediciones (~27), pero cada una tarda
+# un poco mas en proporcion, asi que el porcentaje casi no cambia.
 # Si algun dia hay prisa, subirlo a 500. Lo que NO hay que hacer es achicar el
 # conjunto de validacion: eso rompe la comparabilidad entre corridas.
 EVAL_STEPS = 250

@@ -21,7 +21,10 @@ PDF/  ->  data/extracted/*.md  ->  dataset_alpaca.json  ->  train/test  ->  adap
    escaneados con OCR (docling). El resultado conserva la estructura legal del
    documento (CONSIDERANDO, RESUELVE, ARTICULO, PARAGRAFO).
 2. **Dataset**: cada documento se recorre por articulos y se arman pares
-   pregunta-respuesta en formato alpaca.
+   pregunta-respuesta en formato alpaca. Tambien se agregan ejemplos negativos
+   (articulos o documentos que no existen, otras universidades, datos privados),
+   cuya respuesta es "No tengo informacion...", para que el modelo aprenda a
+   reconocer lo que no sabe en vez de inventar.
 3. **Entrenamiento**: fine-tuning con QLoRA (el modelo base se carga en 4 bits y solo
    se entrena el adaptador).
 4. **Evaluacion**: el adaptador se mide sobre el 30% apartado y sobre un conjunto de
