@@ -169,6 +169,14 @@ _FOOTER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Formulas de cierre: desde aqui empiezan la fecha y las firmas, ya no es texto del articulo.
+# Tolera lo que deja el OCR: tildes cambiadas ("PÚBLIQUESE") y espacios de mas o de menos.
+_CIERRE_RE = re.compile(
+    r"P[UÚ]BL[IÍ]\s*QUESE|COM[UÚ]N[IÍ]\s*QUESE|C[UÚ]\s*MPLASE|NOTIF[IÍ]\s*QUESE|"
+    r"DAD[AO]\s+EN\s+VILLAVICENCIO|PROYECT[OÓ]\s*:",
+    re.IGNORECASE,
+)
+
 # "CAPITULO I", "TITULO II", "CAPITULO PRIMERO" — divisiones del articulado.
 # El ordinal se restringe a romano/ordinal/digito para no capturar "Titulo de..." del cuerpo.
 _ORDINAL = (r"(?:[IVXLC]+|\d+|PRIMER[OA]?|SEGUND[OA]|TERCER[OA]?|CUART[OA]|QUINT[OA]|"
@@ -194,6 +202,31 @@ def _strip_decoration(line: str) -> str:
 
 def _is_table_line(line: str) -> bool:
     return line.lstrip().startswith("|")
+
+
+def _separar_cierre(lines: list[str]) -> list[str]:
+    """Pone "## CIERRE" donde empiezan las firmas, despues del ultimo articulo.
+
+    Sin esto, "PUBLIQUESE... Dada en Villavicencio... JOSE ... Secretario" queda dentro
+    de la respuesta del ultimo articulo. No se borra nada: el texto sigue en el .md,
+    pero bajo otra seccion, y qa_builder no lo usa como articulo. Solo se mira despues
+    del ULTIMO articulo (hay anexos con articulos propios despues de las firmas), y no
+    se corta si el articulo quedaria casi vacio (uno que empiece "Comuniquese la...").
+    """
+    arts = [i for i, l in enumerate(lines) if l.startswith("### ")]
+    if not arts:
+        return lines
+    texto = 0   # caracteres del ultimo articulo antes del posible corte
+    for i in range(arts[-1] + 1, len(lines)):
+        l = lines[i]
+        if l.startswith("#"):          # paragrafos del mismo articulo
+            continue
+        m = None if l.startswith("|") else _CIERRE_RE.search(l)
+        if m and texto + m.start() >= 20:
+            antes, despues = l[:m.start()].rstrip(), l[m.start():]
+            return lines[:i] + ([antes] if antes else []) + ["", "## CIERRE", "", despues] + lines[i + 1:]
+        texto += len(l)
+    return lines
 
 
 def _normalize_markdown(md: str) -> str:
@@ -284,6 +317,7 @@ def _normalize_markdown(md: str) -> str:
 
         out_lines.append(s)
 
+    out_lines = _separar_cierre(out_lines)
     md_out = "\n".join(out_lines)
     md_out = re.sub(r"\n{3,}", "\n\n", md_out)
     return md_out.strip()
