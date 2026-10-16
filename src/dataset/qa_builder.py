@@ -278,12 +278,28 @@ def _parse_structure(body_md: str) -> DocStructure:
 
 
 def _extract_descripcion(header_lines: list[str]) -> str:
-    """Saca el 'Por la cual…' entre comillas del encabezado."""
+    """Saca el 'Por la cual…' del encabezado, con o sin comillas."""
     header = " ".join(header_lines)
     m = re.search(r'[“"«]\s*(Por\s[^”"»]{15,400})[”"»]', header, re.IGNORECASE)
     if m:
         return re.sub(r"\s+", " ", m.group(1)).strip()
-    return ""
+
+    # Sin comillas (40 % de los documentos por OCR): desde la linea "Por el/la cual..."
+    # hasta la autoridad que firma ("EL CONSEJO ACADEMICO", "EL RECTOR", "En uso de...").
+    partes: list[str] = []
+    for linea in header_lines:
+        s = linea.strip()
+        if not partes:
+            if re.match(r'^[“"«]?\s*Por\s+(el|la|lo|medio)\b', s, re.IGNORECASE):
+                partes.append(s)
+            continue
+        if not s:
+            continue
+        if re.match(r"^(E[LI]|LA)\s*[A-ZÁÉÍÓÚÑ]{3,}", s) or re.match(r"^En\s+uso\b", s, re.IGNORECASE):
+            break
+        partes.append(s)
+    desc = re.sub(r"\s+", " ", " ".join(partes)).strip(' “”"«»')
+    return desc if 15 <= len(desc) <= 400 else ""
 
 
 # ---------------------------------------------------------------------------
