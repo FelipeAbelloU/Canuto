@@ -344,7 +344,31 @@ def _normalize_markdown(md: str) -> str:
     return md_out.strip()
 
 
-def _yaml_frontmatter(meta: DocMeta, method: str, pages: int, char_count: int) -> str:
+# Encabezado impreso del documento: "ACUERDO SUPERIOR No. 016 DE 2020". Se busca en la linea
+# SIN espacios (el OCR escribe "A C U E R D O  S U P E R I O R"); puede venir despues del
+# membrete "UNIVERSIDAD DE LOS LLANOS CONSEJO ACADEMICO".
+_IMPRESO_RE = re.compile(
+    r"^(?:UNIVERSIDADDELOSLLA[NÑ]OS)?(?:CONSEJO(?:ACAD[EÉ]MICO|SUPERIOR(?:UNIVERSITARIO)?))?"
+    r"(ACUERDO|RESOLUCI[OÓ]N|DECRETO|LEY)[A-ZÁÉÍÓÚÑ\-]{0,40}?N(?:O|Ú?MERO)?[°º.:]*0*(\d{1,4})DE((?:19|20)\d{2})"
+)
+
+
+def _numero_impreso(text: str) -> tuple[str, str]:
+    """(numero, año) impresos en el encabezado, o ("", "") si no se encuentran.
+
+    Se lee del texto crudo, antes de la limpieza que borra el encabezado. Sirve para
+    detectar PDFs con el nombre equivocado (el archivo 49_2015.pdf es la RS 050 de 2015).
+    """
+    for linea in text.splitlines()[:40]:
+        s = _strip_decoration(linea).upper().replace(" ", "")
+        m = _IMPRESO_RE.match(s)
+        if m:
+            return m.group(2), m.group(3)
+    return "", ""
+
+
+def _yaml_frontmatter(meta: DocMeta, method: str, pages: int, char_count: int,
+                      impreso: tuple[str, str] = ("", "")) -> str:
     def esc(v: str) -> str:
         return '"' + str(v).replace('"', '\\"') + '"'
     return (
@@ -353,6 +377,8 @@ def _yaml_frontmatter(meta: DocMeta, method: str, pages: int, char_count: int) -
         f"tipo_legible: {esc(meta.type_label)}\n"
         f"numero: {esc(meta.number)}\n"
         f"anio: {esc(meta.year)}\n"
+        f"numero_impreso: {esc(impreso[0])}\n"
+        f"anio_impreso: {esc(impreso[1])}\n"
         f"titulo: {esc(meta.titulo)}\n"
         f"fuente: {esc(meta.source_filename)}\n"
         f"ruta_origen: {esc(meta.rel_path)}\n"
@@ -370,5 +396,5 @@ def to_markdown(text: str, meta: DocMeta, method: str, pages: int) -> str:
     se normaliza a estructura legal limpia antes de escribirlo.
     """
     body = _normalize_markdown(text)
-    frontmatter = _yaml_frontmatter(meta, method, pages, len(text))
+    frontmatter = _yaml_frontmatter(meta, method, pages, len(text), _numero_impreso(text))
     return f"{frontmatter}\n# {meta.titulo}\n\n{body}\n"

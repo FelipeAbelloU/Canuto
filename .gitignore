@@ -26,6 +26,9 @@ data/eval/
 # Cola de OCR para la workstation (se regenera al correr extract_text.py)
 data/_ocr_queue.txt
 
+# Lista de numeros impresos distintos al nombre del archivo (salida de revisar_numeros.py)
+data/numeros_por_revisar.tsv
+
 # Registro local de W&B (las corridas viven en wandb.ai)
 wandb/
 
