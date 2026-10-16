@@ -13,6 +13,15 @@ from __future__ import annotations
 from pathlib import Path
 from .pdf_digital import ExtractedDocument
 
+# Idioma del reconocimiento de RapidOCR (el motor que usa docling en la workstation).
+# Sin configurar, docling usa el modelo chino por defecto, y los sellos y firmas salen
+# como caracteres chinos sueltos. "latin" cubre el español (tildes y eñe).
+# Con None se usa la configuracion por defecto de docling (como en la extraccion de julio).
+OCR_IDIOMA = "latin"
+
+# El convertidor carga los modelos de OCR: se crea una sola vez y se reusa en cada PDF.
+_converter = None
+
 
 def _count_pages(path: Path) -> int:
     # Cuenta las paginas del PDF (solo para el reporte; no afecta al OCR).
@@ -30,7 +39,9 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
 
     # Import diferido: docling solo se necesita en la maquina que corre el OCR.
     try:
-        from docling.document_converter import DocumentConverter
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
     except ImportError:
         raise ImportError(
             "docling no está instalado. Va en un venv APARTE (ver requirements-docling.txt).\n"
@@ -40,9 +51,20 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
             "  (en Linux con GPU, más simple: bash install-docling.sh)"
         )
 
+    global _converter
+    if _converter is None:
+        if OCR_IDIOMA is None:
+            _converter = DocumentConverter()
+        else:
+            from rapidocr import LangRec
+            ocr = RapidOcrOptions(rapidocr_params={"Rec.lang_type": LangRec(OCR_IDIOMA)})
+            opciones = PdfPipelineOptions(do_ocr=True, ocr_options=ocr)
+            _converter = DocumentConverter(
+                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opciones)}
+            )
+
     # docling hace el OCR y devuelve el documento ya convertido a Markdown.
-    converter = DocumentConverter()
-    result = converter.convert(str(path))
+    result = _converter.convert(str(path))
     text = result.document.export_to_markdown()
 
     return ExtractedDocument(
