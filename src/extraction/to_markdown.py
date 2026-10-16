@@ -156,6 +156,25 @@ _BANNER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Membrete de la hoja siguiente que el OCR deja a mitad de un articulo. Solo si es la
+# linea COMPLETA (y en mayusculas): "Consejo Academico" dentro de una frase no se toca.
+_MEMBRETE_RE = re.compile(
+    r"^UNIVERSIDAD\s+DE\s+LOS\s+LLA[NÑ]OS\.?$"
+    r"|^CONSEJO\s+(ACAD[EÉ]MICO|SUPERIOR(\s+UNIVERSITARIO)?)\.?$"
+    r"|^CONSEJO\s+(ACAD[EÉ]MICO|SUPERIOR(\s+UNIVERSITARIO)?)\s+(RESOLUCI[ÓO]N|ACUERDO)\b.{0,60}$"
+    r"|^(RESOLUCI[ÓO]N|ACUERDO)\s+(RECTORAL|ACAD[EÉ]MICA?O?|SUPERIOR)\s+No?[°º.]?$",
+    re.IGNORECASE,
+)
+# El mismo encabezado con las letras mal espaciadas por el OCR: "ACUERD OACA DÉM IC ON°022DE2015
+# (Septiembre 29)". Se compara la linea SIN espacios.
+_MEMBRETE_PEGADO_RE = re.compile(
+    r"^(ACUERDO|RESOLUCI[ÓO]N)(ACAD[EÉ]MIC[OA]|SUPERIOR|RECTORAL)?N[°º.]?\d{1,4}DE(19|20)\d{2}(\(.{0,25}\))?\.?$",
+    re.IGNORECASE,
+)
+
+# Marca de pagina del OCR: "Hoja N°. 2", "Hoja 3".
+_HOJA_RE = re.compile(r"^Hoja\s*\S{0,4}\s*\d{1,3}$", re.IGNORECASE)
+
 # Linea de fecha suelta tipo "( Mayo 05 )".
 _DATE_LINE_RE = re.compile(r"^\(\s*[A-Za-zÁÉÍÓÚáéíóú]+\.?\s+\d{1,2}\s*\)$")
 
@@ -272,7 +291,9 @@ def _normalize_markdown(md: str) -> str:
 
         # Ruido a descartar siempre.
         if (_PAGE_NOISE_RE.match(s) or _DATE_LINE_RE.match(s)
-                or _BANNER_RE.search(s) or _FOOTER_RE.search(s)):
+                or _BANNER_RE.search(s) or _FOOTER_RE.search(s) or _HOJA_RE.match(s)
+                or (s[:10].isupper() and _MEMBRETE_RE.match(s))
+                or _MEMBRETE_PEGADO_RE.match(s.replace(" ", ""))):
             continue
 
         # Texto corrido repetido (subtitulo por hoja): conservar 1a aparicion.
