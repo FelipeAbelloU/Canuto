@@ -57,7 +57,12 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
             _converter = DocumentConverter()
         else:
             from rapidocr import LangRec
-            ocr = RapidOcrOptions(rapidocr_params={"Rec.lang_type": LangRec(OCR_IDIOMA)})
+            # backend "torch": el que docling elige solo en la workstation (onnxruntime no
+            # esta instalado). Pedir RapidOcrOptions a mano cambia el default a onnxruntime.
+            ocr = RapidOcrOptions(
+                backend="torch",
+                rapidocr_params={"Rec.lang_type": LangRec(OCR_IDIOMA)},
+            )
             opciones = PdfPipelineOptions(do_ocr=True, ocr_options=ocr)
             _converter = DocumentConverter(
                 format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opciones)}
