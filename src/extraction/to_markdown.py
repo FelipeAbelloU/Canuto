@@ -126,10 +126,17 @@ _SECTION_RE = re.compile(
 )
 
 # "ARTICULO PRIMERO", "ARTICULO 8.", "ARTICULO 8°", "ART. 12"
+# Tambien lo que deja el OCR: "ARTICULO2°." (numero pegado) y "ARTÍCULO. 65°" (punto de mas,
+# asi esta el art. 65 del Reglamento Estudiantil). Pegado solo se acepta si sigue un digito,
+# para no tomar "ARTICULOS" como un articulo "S".
 _ARTICULO_RE = re.compile(
-    r"^(ART[IÍ]CULO|ART\.)\s+([A-Za-zÁÉÍÓÚÑ0-9°º]+)\s*[.:\-–)]*\s*(.*)$",
+    r"^(ART[IÍ]CULO|ART\.)(?:\.?\s+|(?=\d))([A-Za-zÁÉÍÓÚÑ0-9°º]+)\s*[.:\-–)]*\s*(.*)$",
     re.IGNORECASE,
 )
+
+# Caracteres chinos, japoneses y coreanos: el OCR los saca de sellos y firmas. En la
+# normativa nunca hay texto legitimo con ellos, asi que se borran.
+_CJK_RE = re.compile(r"[　-〿㐀-䶿一-鿿豈-﫿]")
 
 # "PARAGRAFO", "PARAGRAFO PRIMERO", "PARAGRAFO 2"
 _PARAGRAFO_RE = re.compile(
@@ -197,7 +204,7 @@ def _normalize_markdown(md: str) -> str:
     - Deduplica lineas de texto corrido repetidas (subtitulos que se repiten por hoja).
     - Re-promueve CONSIDERANDO/RESUELVE→##, ARTICULO→###, PARAGRAFO→####.
     """
-    raw_lines = md.splitlines()
+    raw_lines = [_CJK_RE.sub("", l) for l in md.splitlines()]
 
     # Frecuencia de lineas de texto (sin decoracion) para deduplicar repetidos.
     from collections import Counter
