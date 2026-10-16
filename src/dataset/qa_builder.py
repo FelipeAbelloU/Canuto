@@ -77,6 +77,9 @@ def _valid_num(n: str) -> str:
     n = n.strip()
     if re.fullmatch(r"\d{1,3}", n):
         return n
+    # Numeracion con puntos de los decretos nacionales: "2.5.3.2.1.1"
+    if re.fullmatch(r"\d+(\.\d+)+", n):
+        return n
     if _ROMAN_RE.match(n) and len(n) <= 5:
         return n.upper()
     if n.lower() in _ORDINAL_WORDS:
@@ -91,6 +94,19 @@ _H2_RE = re.compile(r"^##\s+(.+)$")
 _ART_RE = re.compile(r"^###\s+ART[IÍ]CULO\s*(.*)$", re.IGNORECASE)   # tolera "ARTICULO" del OCR
 _PAR_RE = re.compile(r"^####\s+PAR[AÁ]GRAFO\s*(.*)$", re.IGNORECASE)
 
+# Secciones despues de las cuales empiezan los articulos propios del documento.
+_RESOL = {"RESUELVE", "ACUERDA", "DECRETA", "DISPONE", "ORDENA", "RESOLVIÓ", "RESOLVIO"}
+# El resto de la numeracion con puntos queda al inicio del texto: "5.3.2.1.1. Titulo..."
+_PUNTOS_RE = re.compile(r"^(\d+(?:\.\d+)+)[.\s]+")
+# Cuantos encabezados se mira hacia adelante para ver si la numeracion se retoma.
+# Con 2, 3, 4, 6 o 10 da lo mismo; sin limite se traga articulos propios (Ley 1955).
+_VENTANA = 4
+_ORDINAL_VALOR = {
+    "primero": 1, "segundo": 2, "tercero": 3, "cuarto": 4, "quinto": 5, "sexto": 6,
+    "séptimo": 7, "septimo": 7, "octavo": 8, "noveno": 9, "décimo": 10, "decimo": 10,
+    "único": 1, "unico": 1,
+}
+
 
 @dataclass
 class DocStructure:
@@ -98,6 +114,11 @@ class DocStructure:
     considerando: str = ""                      # texto bajo ## CONSIDERANDO
     resuelve: str = ""                           # texto bajo ## RESUELVE antes del 1er articulo
     articles: list[tuple[str, str]] = field(default_factory=list)      # (numero, contenido)
+    # Para el reporte (no generan pares):
+    citados_considerando: int = 0               # "articulos" de otra norma citados en el considerando
+    pegados: int = 0                             # articulos de otra norma pegados al que los modifica
+    fuera: list[str] = field(default_factory=list)    # numeros que la red de seguridad deja por fuera
+    huecos: list[int] = field(default_factory=list)   # numeros que faltan en la secuencia 1, 2, 3...
 
 
 def _join(lines: list[str]) -> str:
@@ -107,7 +128,66 @@ def _join(lines: list[str]) -> str:
 
 def _clean_art_num(raw: str) -> str:
     # Limpia el numero del encabezado "### ARTICULO 5°." -> "5".
-    return raw.strip().strip(".:°º-–) ").strip()
+    num = raw.strip().strip(".:°º-–) ").strip()
+    # "1O" es "1º" mal leido por el OCR (letra O en vez del simbolo).
+    m = re.fullmatch(r"(\d{1,3})[Oo]", num)
+    return m.group(1) if m else num
+
+
+def _num_valor(num: str) -> int | None:
+    # Valor entero del numero para seguir la secuencia (None si no se puede).
+    if num.isdigit():
+        return int(num)
+    return _ORDINAL_VALOR.get(num.lower())
+
+
+def _ordenar_articulos(articles: list[list]) -> tuple[list[tuple[str, str]], int]:
+    """Regla de secuencia: separa los articulos propios del texto citado de otra norma.
+
+    Los articulos propios van en orden (1, 2, 3...). Si aparece un numero fuera de orden
+    y la cuenta se retoma dentro de los _VENTANA encabezados siguientes, esos encabezados
+    son texto citado (una norma que modifica otra) y se pegan al articulo anterior.
+    Ej. RS 30/2021: 1 2 7 3 8 4 9 ... -> 1 2 3 4 ... (el 7, 8, 9 son de la RS 20/2021).
+    Si no se retoma, es un hueco (un encabezado perdido) y se acepta como propio.
+    """
+    # Numeracion con puntos: "ARTICULO 2" + "5.3.2.1.1. Titulo" -> "2.5.3.2.1.1"
+    cand = []
+    for num, txt in articles:
+        mp = _PUNTOS_RE.match(txt) if num.isdigit() else None
+        if mp:
+            cand.append((num + "." + mp.group(1), txt[mp.end():], None))
+        else:
+            cand.append((num, txt, _num_valor(num) if _valid_num(num) else None))
+
+    propios: list[list] = []
+    pegados = 0
+    esperado = None
+    i = 0
+    while i < len(cand):
+        num, txt, v = cand[i]
+        if v is None or esperado is None or v == esperado:
+            propios.append([num, txt])
+            if v is not None:
+                esperado = v + 1
+            i += 1
+            continue
+        # Fuera de orden: buscar si la numeracion se retoma pronto.
+        j = None
+        for k in range(i + 1, min(i + 1 + _VENTANA, len(cand))):
+            if cand[k][2] == esperado:
+                j = k
+                break
+        if j is not None and propios:
+            for k in range(i, j):
+                propios[-1][1] += f" Artículo {cand[k][0]}. {cand[k][1]}"
+                pegados += 1
+            i = j
+            continue
+        propios.append([num, txt])
+        if v > esperado:
+            esperado = v + 1
+        i += 1
+    return [(n, t) for n, t in propios], pegados
 
 
 def _parse_structure(body_md: str) -> DocStructure:
@@ -119,6 +199,16 @@ def _parse_structure(body_md: str) -> DocStructure:
     articles: list[list] = []       # [num, [lineas]]
     target = header                 # donde se acumulan las lineas de contenido actuales
 
+    # Si el documento tiene RESUELVE/ACUERDA, los "articulos" que aparecen antes son
+    # citas de otras normas dentro del considerando, no articulos propios.
+    tiene_resol = any(
+        _H2_RE.match(l) and not l.startswith("###")
+        and _H2_RE.match(l).group(1).strip().upper() in _RESOL
+        for l in lines
+    )
+    visto_resol = False
+    citados = 0
+
     for raw in lines:
         s = raw.rstrip()
 
@@ -129,7 +219,13 @@ def _parse_structure(body_md: str) -> DocStructure:
         # Articulo (### ARTICULO N) -> nuevo bloque de articulo.
         m_art = _ART_RE.match(s)
         if m_art:
-            articles.append([_clean_art_num(m_art.group(1)), []])
+            num = _clean_art_num(m_art.group(1))
+            if tiene_resol and not visto_resol:
+                # Cita dentro del considerando: su texto sigue siendo considerando.
+                target.append(f"Artículo {num}.")
+                citados += 1
+                continue
+            articles.append([num, []])
             target = articles[-1][1]
             continue
 
@@ -145,6 +241,8 @@ def _parse_structure(body_md: str) -> DocStructure:
         m_h2 = _H2_RE.match(s)
         if m_h2 and not s.startswith("### "):
             name = m_h2.group(1).strip().upper()
+            if name in _RESOL:
+                visto_resol = True
             sections.setdefault(name, [])
             target = sections[name]
             continue
@@ -156,7 +254,26 @@ def _parse_structure(body_md: str) -> DocStructure:
     st.descripcion = _extract_descripcion(header)
     st.considerando = _join(sections.get("CONSIDERANDO", []))
     st.resuelve = _join(sections.get("RESUELVE", []) or sections.get("ACUERDA", []))
-    st.articles = [(num, _join(ls)) for num, ls in articles if _join(ls)]
+    st.citados_considerando = citados
+
+    propios, st.pegados = _ordenar_articulos([(num, _join(ls)) for num, ls in articles])
+
+    # Red de seguridad: numero invalido, repetido o sin texto -> ese articulo no genera
+    # pares. Nunca se inventa un numero con la posicion.
+    cuenta: dict[str, int] = {}
+    for num, _ in propios:
+        cuenta[num] = cuenta.get(num, 0) + 1
+    for num, txt in propios:
+        if txt and cuenta[num] == 1 and _valid_num(num):
+            st.articles.append((num, txt))
+        else:
+            st.fuera.append(num)
+
+    # Huecos en la numeracion (1, 2, 4 -> falta el 3). Solo se reportan: el articulo
+    # anterior a un hueco puede traer pegado el texto del que falta (AS 20/2021, art. 64-65).
+    enteros = {int(n) for n, _ in st.articles if n.isdigit()}
+    if enteros:
+        st.huecos = [n for n in range(1, max(enteros) + 1) if n not in enteros]
     return st
 
 
@@ -186,8 +303,8 @@ def _doc_ref(meta: dict) -> tuple[str, str, str]:
     return tipo, cita, f"{cita} de la Universidad de los Llanos (Unillanos)"
 
 
-def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QAPair]:
-    """Genera ~max_pairs pares QA fundamentados desde un documento en Markdown.
+def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
+    """Genera los pares QA fundamentados de un documento en Markdown (sin tope: todos sus articulos).
 
     Estrategia:
       1. Pregunta(s) general(es) sobre de que trata el documento.
@@ -219,21 +336,10 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
         pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
     # ── 2. Un par por articulo (el nucleo del dataset) ────────────────────
-    # Se garantiza un numero UNICO por articulo para no crear preguntas
-    # identicas con respuestas distintas (datos contradictorios).
-    seen: set[str] = set()
-    for idx, (raw_num, content) in enumerate(st.articles, start=1):
-        if len(pairs) >= max_pairs - 1:   # dejar sitio para la vigencia
-            break
+    # El parser ya garantiza un numero UNICO y valido por articulo (los dudosos
+    # quedan fuera), asi que no hay preguntas identicas con respuestas distintas.
+    for raw_num, content in st.articles:
         num = _valid_num(raw_num)
-        if not num or num in seen:
-            # Si el numero no es valido o se repite: usar el numero que
-            # encabeza el contenido ("1. OTORGAR...") o la posicion.
-            lead = re.match(r"^\s*(\d{1,3})[.\)]", content)
-            num = lead.group(1) if (lead and lead.group(1) not in seen) else str(idx)
-        if num in seen:
-            continue
-        seen.add(num)
 
         q = f"¿Qué establece el artículo {num} {de_la} {cita}{suf_q}?"
         a = f"Según el artículo {num} {de_la} {cita}{entidad}, se establece: {content}"
@@ -257,13 +363,13 @@ def generate_heuristic(body_md: str, meta: dict, max_pairs: int = 10) -> list[QA
     # ── 4. Vigencia (si aparece explicita) ────────────────────────────────
     vig = re.search(r"(rige\s+a\s+partir[^.\n]{5,160}|entrar[áa]?\s+en\s+vigen[^.\n]{5,160})",
                     body_md, re.IGNORECASE)
-    if vig and len(pairs) < max_pairs:
+    if vig:
         pairs.append(QAPair(
             f"¿Desde cuándo rige {la} {cita}{suf_q}?",
             f"{La} {cita}{entidad} {vig.group(1).strip()}.",
         ))
 
-    return pairs[:max_pairs]
+    return pairs
 
 
 # ---------------------------------------------------------------------------
