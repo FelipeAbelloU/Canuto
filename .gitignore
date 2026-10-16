@@ -12,6 +12,8 @@ PDF/
 
 # Textos extraídos (se regeneran con scripts/extract_text.py)
 data/extracted/
+# Texto crudo de cada PDF (salida del OCR; se regenera con extract_text.py)
+data/raw/
 
 # Dataset y splits (se regeneran con build_dataset.py y split_dataset.py)
 data/dataset/dataset_alpaca.json

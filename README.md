@@ -50,6 +50,7 @@ source venv/bin/activate
 
 python scripts/extract_text.py            # PDFs digitales a Markdown
 python scripts/extract_text.py --ocr      # escaneados (usar el venv de docling)
+python scripts/extract_text.py --solo-md  # rehace los .md desde data/raw/ sin repetir el OCR
 python scripts/build_dataset.py           # pares pregunta-respuesta
 python scripts/split_dataset.py           # division 70/30
 python scripts/train_gpu.py               # entrenamiento QLoRA

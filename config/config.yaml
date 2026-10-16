@@ -20,7 +20,8 @@ model:
 # Paso 1: PDFs -> Markdown.
 extraction:
   pdf_dir: "PDF"
-  output_dir: "data/extracted"
+  raw_dir: "data/raw"            # texto crudo de cada PDF (etapa 1, se hace una vez)
+  output_dir: "data/extracted"   # .md limpios (etapa 2, se rehacen desde el crudo)
 
 # Paso 2: Markdown -> pares pregunta/respuesta.
 dataset:
