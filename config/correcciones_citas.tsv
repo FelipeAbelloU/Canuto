@@ -1,0 +1,55 @@
+archivo	accion	numero	anio	nota
+2015/si/normatividad/ACUERDO_ACADEMICO/5_2015_u7v9cjM.pdf	excluir			duplicado: es copia de la AA 6/2015
+2015/si/normatividad/RESOLUCION_SUPERIOR/1_2015_UIY3Ygu.pdf	excluir			duplicado: es copia de la RS 1/2016
+2017/si/normatividad/ACUERDO_SUPERIOR/9_2017.pdf	excluir			duplicado: es copia de la AS 6/2017
+2018/si/normatividad/RESOLUCION_ACADEMICA/35_2018.pdf	excluir			duplicado: es copia de la RA 35/2017
+2019/si/normatividad/RESOLUCION_ACADEMICA/30_2019.pdf	excluir			duplicado: es copia de la RA 30/2018
+2022/si/normatividad/ACUERDO_ACADEMICO/17_2022.pdf	excluir			duplicado: es copia de la AA 11/2022
+2024/si/normatividad/ACUERDO_ACADEMICO/15_2024.pdf	excluir			duplicado: es copia de la AA 8/2024
+2025/si/normatividad/RESOLUCION_SUPERIOR/29_2025_9mozzMT.pdf	excluir			duplicado: es copia de la RS 30/2025
+2026/si/normatividad/RESOLUCION_ACADEMICA/28_2026_hOSb4dQ.pdf	excluir			duplicado: es copia de la RA 30/2026
+2026/si/normatividad/RESOLUCION_ACADEMICA/55_2026_lzlA19g.pdf	excluir			duplicado: es copia de la RA 57/2026
+2026/si/normatividad/RESOLUCION_RECTORAL/204_2026.pdf	excluir			duplicado: es copia de la RR 240/2026
+2020/si/normatividad/RESOLUCION_SUPERIOR/31_2020.pdf	citar_como	32	2020	intercambiada con 32_2020
+2020/si/normatividad/RESOLUCION_SUPERIOR/32_2020.pdf	citar_como	31	2020	intercambiada con 31_2020
+2020/si/normatividad/RESOLUCION_SUPERIOR/7_2020_rx29D8D.pdf	citar_como	8	2020	cadena: el 7 es la 8
+2020/si/normatividad/RESOLUCION_SUPERIOR/8_2020.pdf	citar_como	9	2020	cadena: el 8 es la 9
+2015/si/normatividad/RESOLUCION_SUPERIOR/49_2015.pdf	citar_como	50	2015	nombre del archivo equivocado: se usa el numero impreso
+2015/si/normatividad/RESOLUCION_SUPERIOR/55_2015_WuGoZde.pdf	citar_como	56	2015	nombre del archivo equivocado: se usa el numero impreso
+2015/si/normatividad/RESOLUCION_SUPERIOR/60_2015.pdf	citar_como	61	2015	nombre del archivo equivocado: se usa el numero impreso
+2015/si/normatividad/RESOLUCION_SUPERIOR/9_2015.pdf	citar_como	8	2015	nombre del archivo equivocado: se usa el numero impreso
+2016/si/normatividad/RESOLUCION_SUPERIOR/3_2016_1Us2SN5.pdf	citar_como	4	2016	nombre del archivo equivocado: se usa el numero impreso
+2017/si/normatividad/ACUERDO_ACADEMICO/20_2017_yUmAVir.pdf	citar_como	24	2017	nombre del archivo equivocado: se usa el numero impreso
+2017/si/normatividad/RESOLUCION_ACADEMICA/2017_2017.pdf	citar_como	85	2017	nombre del archivo equivocado: se usa el numero impreso
+2017/si/normatividad/RESOLUCION_ACADEMICA/60_2017_i0LHADU.pdf	citar_como	60	2016	nombre del archivo equivocado: se usa el numero impreso
+2017/si/normatividad/RESOLUCION_ACADEMICA/68_2017_2O0KGpq.pdf	citar_como	68	2016	nombre del archivo equivocado: se usa el numero impreso
+2018/si/normatividad/ACUERDO_ACADEMICO/18_2018_O8A7J7W.pdf	citar_como	18	2015	nombre del archivo equivocado: se usa el numero impreso
+2018/si/normatividad/ACUERDO_ACADEMICO/2_2018_tdCfOWH.pdf	citar_como	2	2017	nombre del archivo equivocado: se usa el numero impreso
+2018/si/normatividad/RESOLUCION_SUPERIOR/32_2018_7RrMjhQ.pdf	citar_como	33	2018	nombre del archivo equivocado: se usa el numero impreso
+2019/si/normatividad/RESOLUCION_ACADEMICA/2019_2019.pdf	citar_como	58	2019	nombre del archivo equivocado: se usa el numero impreso
+2019/si/normatividad/RESOLUCION_SUPERIOR/6_2019.pdf	citar_como	6	2020	nombre del archivo equivocado: se usa el numero impreso
+2020/si/normatividad/RESOLUCION_CONSEJO_DE_FACULTAD_-_FCBI/17_2020.pdf	citar_como	59	2020	nombre del archivo equivocado: se usa el numero impreso
+2020/si/normatividad/RESOLUCION_SUPERIOR/23_2020_I384NGC.pdf	citar_como	24	2020	nombre del archivo equivocado: se usa el numero impreso
+2021/si/normatividad/RESOLUCION_ACADEMICA/8_2021_dALhfLy.pdf	citar_como	8	2020	nombre del archivo equivocado: se usa el numero impreso
+2022/si/normatividad/RESOLUCION_RECTORAL/2022_2022.pdf	citar_como	112	2022	nombre del archivo equivocado: se usa el numero impreso
+2023/si/normatividad/ACUERDO_SUPERIOR/18_2023.pdf	citar_como	18	2024	nombre del archivo equivocado: se usa el numero impreso
+2024/si/normatividad/ACUERDO_ACADEMICO/24_2024_xKWDV9A.pdf	citar_como	24	2025	nombre del archivo equivocado: se usa el numero impreso
+2024/si/normatividad/ACUERDO_ACADEMICO/25_2024_N5EnhEP.pdf	citar_como	25	2025	nombre del archivo equivocado: se usa el numero impreso
+2024/si/normatividad/RESOLUCION_ACADEMICA/137_2024.pdf	citar_como	137	2025	nombre del archivo equivocado: se usa el numero impreso
+2024/si/normatividad/RESOLUCION_ACADEMICA/138_2024.pdf	citar_como	138	2025	nombre del archivo equivocado: se usa el numero impreso
+2024/si/normatividad/RESOLUCION_ACADEMICA/139_2024.pdf	citar_como	139	2025	nombre del archivo equivocado: se usa el numero impreso
+2025/si/normatividad/RESOLUCION_ACADEMICA/53_2025.pdf	citar_como	53	2024	nombre del archivo equivocado: se usa el numero impreso
+2025/si/normatividad/RESOLUCION_CONSEJO_DE_FACULTAD_-_FCBI/6_2025.pdf	citar_como	61	2025	nombre del archivo equivocado: se usa el numero impreso
+2026/si/normatividad/ACUERDO_SUPERIOR/2_2026_13Vs8Ti.pdf	citar_como	4	2026	nombre del archivo equivocado: se usa el numero impreso
+2026/si/normatividad/RESOLUCION_ACADEMICA/17_2026_RxqGL8a.pdf	citar_como	18	2026	nombre del archivo equivocado: se usa el numero impreso
+2022/si/normatividad/ACUERDO_ACADEMICO/3_2022.pdf	citar_como	3	2022	conflicto: imprime AA 3/2021 igual que otro documento; se deja el nombre del archivo
+2026/si/normatividad/ACUERDO_ACADEMICO/10_2026.pdf	citar_como	10	2026	conflicto: imprime AA 10/2025 igual que otro documento; se deja el nombre del archivo
+2019/si/normatividad/RESOLUCION_SUPERIOR/16_2019.pdf	citar_como	16	2019	conflicto: imprime RS 16/2018 igual que otro documento; se deja el nombre del archivo
+2021/si/normatividad/ACUERDO_SUPERIOR/16_2021.pdf	citar_como	16	2021	conflicto: imprime AS 16/2020 igual que el de regalias; se deja el nombre del archivo
+2020/si/normatividad/ACUERDO_SUPERIOR/16_2020_sbcdMmI.pdf	excluir			duplicado: es copia de 16_2021
+2015/si/normatividad/ACUERDO_ACADEMICO/3_2015_9JYqTCE.pdf	excluir			duplicado: es copia de 3_2015
+2018/si/normatividad/ACUERDO_ACADEMICO/16_2018_uptYDDB.pdf	excluir			duplicado: es copia de 16_2018
+2022/si/normatividad/RESOLUCION_RECTORAL/92_2022_Gm7b6RI.pdf	excluir			duplicado: es copia de 92_2022
+2023/si/normatividad/RESOLUCION_RECTORAL/1650_2023_GoyLOll.pdf	excluir			duplicado: es copia de 1650_2023
+2016/si/normatividad/RESOLUCION_SUPERIOR/9_2016_bDWAJPp.pdf	citar_como	10	2016	nombre del archivo equivocado: imprime 010 (el OCR leyo 01O)
+2020/si/normatividad/RESOLUCION_SUPERIOR/21_2020_KF21LZ9.pdf	citar_como	22	2020	nombre del archivo equivocado: imprime 022 (modifica la RS 21/2020)

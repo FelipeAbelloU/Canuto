@@ -11,6 +11,7 @@ Uso:
 """
 import sys
 import re
+import csv
 import json
 import random
 from pathlib import Path
@@ -43,6 +44,19 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
             val = val.strip().strip('"')
             meta[key.strip()] = val
     return meta, body.lstrip("\n")
+
+
+def cargar_correcciones(ruta: Path) -> dict:
+    """Lee config/correcciones_citas.tsv: ruta del PDF -> fila (accion, numero, anio).
+
+    Son los PDF que tienen en el nombre un numero distinto al impreso, revisados a
+    mano. No se renombra ningun PDF: la correccion se aplica aqui, asi un OCR nuevo
+    no la deshace. accion = "citar_como" (usar numero y anio) o "excluir" (duplicado).
+    """
+    if not ruta.exists():
+        return {}
+    with open(ruta, encoding="utf-8") as f:
+        return {fila["archivo"]: fila for fila in csv.DictReader(f, delimiter="\t")}
 
 
 def main():
@@ -83,13 +97,28 @@ def main():
     # Primera pasada: indice de todos los documentos del corpus con su ultimo
     # articulo. Con esto los negativos preguntan por cosas que de verdad no
     # estan en el corpus. Si un documento esta repetido se queda el mayor.
+    # Antes de indexar se corrigen las citas de los PDF mal nombrados.
+    correcciones = cargar_correcciones(root / "config/correcciones_citas.tsv")
+    usadas = set()
+    excluidos = 0
     docs = []
     indice: dict = {}
     for src_path in src_files:
         meta, body = _split_frontmatter(src_path.read_text(encoding="utf-8"))
+        fila = correcciones.get(meta.get("ruta_origen", ""))
+        if fila:
+            usadas.add(fila["archivo"])
+            if fila["accion"] == "excluir":
+                excluidos += 1
+                continue
+            meta["numero"], meta["anio"] = fila["numero"], fila["anio"]
         docs.append((src_path, meta, body))
         key = cita_key(meta)
         indice[key] = max(indice.get(key, 0), ultimo_articulo(body))
+    print(f"Correcciones de citas: {len(usadas)} de {len(correcciones)} aplicadas "
+          f"({excluidos} duplicados excluidos)")
+    for archivo in sorted(set(correcciones) - usadas):
+        print(f"  OJO: no se encontro el .md de {archivo}")
     print(f"Indice del corpus: {len(indice)} documentos distintos\n")
 
     rng = random.Random(SEMILLA)
