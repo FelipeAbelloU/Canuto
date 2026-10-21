@@ -12,6 +12,8 @@ PDF/
 
 # Textos extraídos (se regeneran con scripts/extract_text.py)
 data/extracted/
+# copias viejas o de prueba de los .md (extracted_viejo, extracted_nuevo...)
+data/extracted_*/
 # Texto crudo de cada PDF (salida del OCR; se regenera con extract_text.py)
 data/raw/
 
@@ -50,6 +52,9 @@ desktop.ini
 
 # Logs
 *.log
+
+# Paquetes para pasar datos entre la workstation y el portatil
+*.tar.gz
 
 # IDEs
 .idea/
