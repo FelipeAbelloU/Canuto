@@ -319,6 +319,81 @@ def _doc_ref(meta: dict) -> tuple[str, str, str]:
     return tipo, cita, f"{cita} de la Universidad de los Llanos (Unillanos)"
 
 
+# ---------------------------------------------------------------------------
+# Articulos largos
+# ---------------------------------------------------------------------------
+# El chat genera hasta 1024 tokens (max_new_tokens). Una respuesta mas larga
+# nunca saldria completa, asi que se parte. Se mide en caracteres porque en el
+# portatil no esta el tokenizador. Con el de Qwen el texto normal da ~3,4
+# caracteres por token, pero el denso (numeros, siglas, ruido del OCR) baja a ~2.
+# Con 2.000 caracteres la respuesta mas larga del corpus queda en 972 tokens.
+LIMITE_RESPUESTA = 2000
+
+# Palabras para decir de que es la tabla que se quita.
+_TEMAS_TABLA = [
+    ("calendario", "el calendario"),
+    ("plan de estudio", "el plan de estudios"),
+    ("tarifa", "las tarifas"),
+    ("presupuesto", "el presupuesto"),
+    ("rubro", "el presupuesto"),
+    ("estudiante", "el listado de estudiantes"),
+    ("valor", "los valores"),
+]
+
+
+def _quitar_tabla(texto: str, documento: str) -> tuple[str, str]:
+    """Quita la tabla (lo que va entre la primera y la ultima "|") y devuelve
+    (texto sin la tabla, frase que remite al documento)."""
+    ini, fin = texto.find("|"), texto.rfind("|")
+    tema = "información adicional"
+    for clave, nombre in _TEMAS_TABLA:
+        if clave in texto.lower():
+            tema = nombre
+            break
+    aviso = f" Este artículo incluye una tabla con {tema}; para el detalle consulta {documento}."
+    return (texto[:ini] + " " + texto[fin + 1:]).strip(), aviso
+
+
+_PARAGRAFO_RE = re.compile(r"Parágrafo( [^:]{1,15})?:")
+
+
+def _separar_paragrafos(texto: str) -> tuple[str, list[tuple[str, str]]]:
+    """Separa "cuerpo Parágrafo 1: ... Parágrafo 2: ..." en (cuerpo, [(numero, texto)]).
+    Si los paragrafos vienen sin numero o repetidos, no se separan (saldrian dos
+    preguntas iguales con respuestas distintas)."""
+    partes = _PARAGRAFO_RE.split(texto)
+    cuerpo = partes[0].strip()
+    paragrafos = [((partes[i] or "").strip(), partes[i + 1].strip()) for i in range(1, len(partes), 2)]
+    numeros = [n for n, _ in paragrafos]
+    if len(paragrafos) > 1 and (not all(numeros) or len(set(numeros)) < len(numeros)):
+        return texto, []
+    return cuerpo, paragrafos
+
+
+def _trozos(texto: str, limite: int) -> list[str]:
+    """Parte un texto largo en trozos de menos de `limite` caracteres. Corta en un
+    literal ("a)"), un numeral ("2.") o un punto seguido, nunca a mitad de frase."""
+    piezas = []
+    for p in re.split(r"(?<=[.;:])\s+(?=[a-zñ]\)\s|\d{1,2}[.)]\s|[A-ZÁÉÍÓÚÑ¿])", texto):
+        # Ultimo recurso (tablas que el OCR leyo sin "|"): cortar entre palabras.
+        while len(p) > limite:
+            corte = p.rfind(" ", 0, limite)
+            corte = corte if corte > 0 else limite
+            piezas.append(p[:corte])
+            p = p[corte:].strip()
+        piezas.append(p)
+    trozos, actual = [], ""
+    for p in piezas:
+        if actual and len(actual) + 1 + len(p) > limite:
+            trozos.append(actual)
+            actual = p
+        else:
+            actual = f"{actual} {p}".strip()
+    if actual:
+        trozos.append(actual)
+    return trozos
+
+
 def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
     """Genera los pares QA fundamentados de un documento en Markdown (sin tope: todos sus articulos).
 
@@ -344,10 +419,9 @@ def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
 
     # ── 1. Preguntas generales ────────────────────────────────────────────
     if st.descripcion:
+        # Solo la descripcion: antes se pegaba el articulo 1 completo y 1.536
+        # respuestas pasaban del limite de lo que el modelo puede generar.
         intro_ans = f"{La} {cita}{entidad} es la norma «{st.descripcion}»."
-        # Añadir el primer articulo como contexto de lo que dispone.
-        if st.articles:
-            intro_ans += f" En su artículo {st.articles[0][0] or '1'} establece: {st.articles[0][1]}"
         pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans))
         pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
@@ -356,10 +430,35 @@ def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
     # quedan fuera), asi que no hay preguntas identicas con respuestas distintas.
     for raw_num, content in st.articles:
         num = _valid_num(raw_num)
+        del_art = f"del artículo {num} {de_la} {cita}"
 
         q = f"¿Qué establece el artículo {num} {de_la} {cita}{suf_q}?"
         a = f"Según el artículo {num} {de_la} {cita}{entidad}, se establece: {content}"
-        pairs.append(QAPair(q, a))
+        if len(a) <= LIMITE_RESPUESTA:
+            pairs.append(QAPair(q, a))
+            continue
+
+        # Articulo largo. Primero se quita la tabla grande (el modelo no puede
+        # recitar un calendario o un plan de estudios sin inventar filas).
+        aviso = ""
+        if "|" in content:
+            content, aviso = _quitar_tabla(content, f"{la} {cita}")
+
+        # Despues se parte en cuerpo + paragrafos, y si un pedazo sigue largo,
+        # en partes cortadas en un literal, numeral o punto seguido.
+        cuerpo, paragrafos = _separar_paragrafos(content)
+        nota = f" Además tiene {len(paragrafos)} parágrafo(s), que puedes consultar por separado." if paragrafos else ""
+        unidades = [(q, f"Según el artículo {num} {de_la} {cita}{entidad}, se establece:", cuerpo, aviso + nota)]
+        for np, texto in paragrafos:
+            el_par = f"el parágrafo {np}" if np else "el parágrafo"
+            unidades.append((f"¿Qué establece {el_par} {del_art}{suf_q}?",
+                             f"Según {el_par} {del_art}{entidad}, se establece:", texto, ""))
+        for pregunta, inicio, texto, final in unidades:
+            trozos = _trozos(texto, LIMITE_RESPUESTA - len(inicio) - len(final))
+            for i, trozo in enumerate(trozos, 1):
+                parte = f" (parte {i} de {len(trozos)})" if len(trozos) > 1 else ""
+                fin = final if i == len(trozos) else ""
+                pairs.append(QAPair(pregunta[:-1] + parte + "?", f"{inicio}{parte} {trozo}{fin}"))
 
     # ── 3. Fallback: documentos sin articulos (actas, comunicados) ────────
     if not st.articles:

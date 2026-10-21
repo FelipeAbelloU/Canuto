@@ -57,7 +57,7 @@ WARMUP_RATIO = 0.1        # 0.03, 0.1, 0.2    (5-10% de los pasos es lo usual)
 # --- Fijos: NO cambiar entre corridas o dejan de ser comparables -----------
 MODELO_BASE = "Qwen/Qwen2.5-7B-Instruct"
 DATASET_TRAIN = RAIZ / "data/dataset/train.json"
-SEQ_LEN = 1024            # cambiarlo cambia que se trunca
+SEQ_LEN = 2048            # cambiarlo cambia que se trunca. Con 1024 se cortaba el 27 % del texto
 BATCH_SIZE = 1            # batch efectivo = 1 x 8 = 8 (limite de los 16 GB)
 ACUMULACION = 8
 # OJO: LORA_DROPOUT y WARMUP_RATIO ya NO van aqui. Subieron al bloque de

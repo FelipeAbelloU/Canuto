@@ -44,9 +44,9 @@ from src.factory import create_model
 # corridas. Se fijan aqui y NO se leen de config.yaml a proposito, porque ese
 # archivo lo comparte la interfaz web y puede cambiar en cualquier momento.
 LIMITE_POR_DEFECTO = 150   # cuantas preguntas de test.json se evaluan
-MAX_NEW_TOKENS = 512
+MAX_NEW_TOKENS = 1024     # dataset v2: ninguna respuesta pasa de ~900 tokens
 TEMPERATURA = 0            # greedy: la misma pregunta da siempre la misma respuesta
-SEQ_LEN = 1024             # el mismo del entrenamiento (para la perdida)
+SEQ_LEN = 2048             # el mismo del entrenamiento (para la perdida)
 
 MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 

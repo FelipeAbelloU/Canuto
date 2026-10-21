@@ -11,9 +11,9 @@ model:
   checkpoint_path: ""    #IMPORTANTE 
   device: cuda
   # OJO: estos tres NO afectan la evaluacion. evaluate.py fija los suyos por
-  # dentro (greedy, 512 tokens) para que la corrida 1 y la 15 sean comparables
+  # dentro (greedy, 1024 tokens) para que todas las corridas sean comparables
   # aunque aqui se cambien para chatear.
-  max_new_tokens: 512
+  max_new_tokens: 1024   # el dataset v2 parte las respuestas para que quepan (~900 tokens)
   temperature: 0.3
   top_p: 0.85
 
