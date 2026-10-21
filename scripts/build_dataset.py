@@ -22,7 +22,7 @@ import argparse
 from src.config_loader import load_config
 from src.dataset.qa_builder import (
     generate_heuristic, generate_negatives, generate_generales,
-    cita_key, ultimo_articulo, save_dataset, QAPair
+    cita_key, ultimo_articulo, save_dataset, enmascarar, QAPair
 )
 
 # Semilla fija: los numeros falsos de los negativos salen siempre iguales.
@@ -168,6 +168,14 @@ def main():
     duplicados = len(all_pairs) - len(unique_pairs)
     all_pairs = unique_pairs
 
+    # Cedulas, pasaportes y codigos de estudiante -> "(dato reservado)".
+    enmascarados = 0
+    for p in all_pairs:
+        q, a = enmascarar(p.question), enmascarar(p.answer)
+        if (q, a) != (p.question, p.answer):
+            enmascarados += 1
+        p.question, p.answer = q, a
+
     output_file = output_dir / "dataset_alpaca.json"
     save_dataset(all_pairs, output_file)
     if duplicados:
@@ -181,6 +189,7 @@ def main():
         print(f"\nDocumentos omitidos por filtro de tipo: {omitidos}")
 
     print(f"\nNegativos: {n_negativos} (antes de quitar duplicados)")
+    print(f"Pares con datos personales enmascarados: {enmascarados}")
     print(f"Total: {len(all_pairs)} pares QA en {output_file}")
 
 

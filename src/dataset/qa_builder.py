@@ -573,6 +573,45 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
     return pairs
 
 
+# ---------------------------------------------------------------------------
+# Datos personales: cedulas, pasaportes y codigos de estudiante
+# ---------------------------------------------------------------------------
+# Las resoluciones de exoneraciones, tutelas o intercambios traen la cedula o el
+# pasaporte del estudiante. Se cambia SOLO el numero por "(dato reservado)" y se
+# deja la frase, asi la respuesta se sigue entendiendo. Los nombres y los correos
+# institucionales se dejan (son publicos). Se usa [ \t] y no \s porque las
+# tablas traen cientos de espacios seguidos y la busqueda se vuelve eterna.
+_DATOS_PERSONALES_RE = [
+    # "cedula de ciudadania N° 1.121.904.438", "C.C. 40.123.456", "1'123.512.874"
+    re.compile(r"((?:c[ée]dula(?:[ \t]+de[ \t]+ciudadan[íi]a)?|\bC\.[ \t]?C\.?)[ \t]*"
+               r"(?:No\.?|N\.?[ \t]?[°ºo]\.?|n[úu]mero)?[ \t]*:?[ \t]*)\d{1,3}(?:[.'’]?\d{3}){1,3}", re.IGNORECASE),
+    # "pasaporte N° G16541406", "Pasaporte N.o GL431965", "N. º"
+    re.compile(r"(pasaporte[ \t]*(?:No\.?|N\.?[ \t]?[°ºo]\.?|n[úu]mero)?[ \t]*:?[ \t]*)[A-Z]{0,3}[ \t]?\d[\dA-Z]{4,15}",
+               re.IGNORECASE),
+    # "codigo N° 117003035", "codigo (164003701)", pegado: "143002731del". 8 a 12 cifras
+    re.compile(r"(c[óo]digo(?:[ \t]+estudiantil)?[ \t]*(?:No\.?|N\.?[ \t]?[°ºo]\.?)?[ \t]*:?[ \t]*)\(?\d{8,12}(?!\d)\)?",
+               re.IGNORECASE),
+]
+
+# Tablas con listas de estudiantes: "| JUAN PEREZ GOMEZ | 1.116.864.141 | 12100234 |".
+# Ahi el numero va sin la palabra "cedula". Si el texto trae una fila asi (nombre
+# en mayusculas y luego un numero), se tapan las celdas que son solo un numero de
+# 7 a 12 cifras. Las tablas de presupuesto no tienen nombres y no se tocan.
+_FILA_PERSONA_RE = re.compile(
+    r"\|[ \t*]*[A-ZÁÉÍÓÚÑ]{2,}(?:[ \t]+[A-ZÁÉÍÓÚÑ]{2,}){1,5}[ \t*]*\|"
+    r"[ \t*]*(?:\d{1,3}[.'’]\d{3}[.'’]\d{3}|\d{7,12})[ \t*]*\|")
+_CELDA_NUMERO_RE = re.compile(r"(\|[ \t*]*)(?:\d{1,3}(?:[.'’]\d{3}){2,3}|\d{7,12})([ \t*]*)(?=\|)")
+
+
+def enmascarar(texto: str) -> str:
+    """Cambia cedulas, pasaportes y codigos de estudiante por "(dato reservado)"."""
+    for rx in _DATOS_PERSONALES_RE:
+        texto = rx.sub(r"\1(dato reservado)", texto)
+    if _FILA_PERSONA_RE.search(texto):
+        texto = _CELDA_NUMERO_RE.sub(r"\1(dato reservado)\2", texto)
+    return texto
+
+
 def save_dataset(pairs: list[QAPair], output_path: str | Path) -> None:
     """Guarda el dataset en un JSON con formato alpaca."""
     output_path = Path(output_path)
