@@ -435,7 +435,7 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
         pairs.append(QAPair(
             f"¿Qué establece el artículo {falso} {de_la} {cita}{suf_q}?",
             f"No tengo información sobre el artículo {falso} {de_la} {cita}. "
-            f"Es posible que ese artículo no exista; le sugiero verificar el número del artículo.",
+            f"Es posible que ese artículo no exista; te sugiero verificar el número del artículo.",
         ))
 
     if not (numero.isdigit() and anio.isdigit()):
@@ -448,7 +448,7 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
         pairs.append(QAPair(
             f"¿De qué trata {la} {cita_mala}{suf_q}?",
             f"No tengo información sobre {la} {cita_mala}. Conozco {la} {cita}, "
-            f"así que es posible que el año no coincida; le sugiero verificarlo.",
+            f"así que es posible que el año no coincida; te sugiero verificarlo.",
         ))
 
     # 3. Numero que no existe: mismo tipo y año, otro numero que no este en el corpus.
@@ -458,7 +458,7 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
         pairs.append(QAPair(
             f"¿Qué regula {la} {cita_mala}{suf_q}?",
             f"No tengo información sobre {la} {cita_mala}. "
-            f"Le sugiero verificar el número y el año del documento.",
+            f"Te sugiero verificar el número y el año del documento.",
         ))
 
     return pairs
@@ -505,7 +505,7 @@ UNILLANOS_FUERA = [
 ]
 RESPUESTA_UNILLANOS_FUERA = (
     "No tengo información sobre eso. Solo conozco la normativa de la Universidad de los "
-    "Llanos; para ese dato le sugiero consultar directamente con la dependencia encargada."
+    "Llanos; para ese dato te sugiero consultar directamente con la dependencia encargada."
 )
 
 DATOS_PRIVADOS = [
@@ -564,7 +564,7 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
         pairs.append(QAPair(
             f"¿Qué dispone {la} {cita} de Unillanos?",
             f"No tengo información sobre {la} {cita}. "
-            f"Le sugiero verificar el número y el año del documento.",
+            f"Te sugiero verificar el número y el año del documento.",
         ))
 
     for p in preguntas_generales:
