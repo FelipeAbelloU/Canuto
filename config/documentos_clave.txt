@@ -8,7 +8,8 @@ ACUERDO_SUPERIOR 3 2023                           # Reglamento Estudiantil de po
 ACUERDO_SUPERIOR 3 2021                           # Estatuto General
 ACUERDO_ACADEMICO 16 2025                         # Opciones de grado (tecnologico y profesional)
 RESOLUCION_CONSEJO_DE_FACULTAD_-_FCBI 61 2025     # Opciones de grado de la FCBI
-ACUERDO_ACADEMICO 11 2025                         # Segunda lengua
+ACUERDO_ACADEMICO 11 2025                         # Segunda lengua de posgrado
+ACUERDO_ACADEMICO 3 2023                          # Segunda lengua de pregrado (Plan BULL)
 ACUERDO_ACADEMICO 14 2021                         # Movilidad nacional e internacional
 ACUERDO_SUPERIOR 7 2024                           # Tarifas de derechos pecuniarios
 ACUERDO_SUPERIOR 1 2015                           # Inscripcion, seleccion y admision
