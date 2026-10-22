@@ -60,10 +60,8 @@ def main():
             # es como pregunta un estudiante real, sin citar el articulo.
             abiertas = [i for i, r in enumerate(grupo) if r.get("familia") in ("B", "E")]
             elegida = rng.choice(abiertas) if abiertas else rng.randrange(len(grupo))
-            test.append(grupo[elegida])
-            train.extend(r for i, r in enumerate(grupo) if i != elegida)
-        else:
-            train.extend(grupo)
+            test.append(grupo.pop(elegida))
+        train.extend(grupo)
     test_pos = len(test)
 
     # Negativos: al azar.
@@ -93,9 +91,7 @@ def main():
     print(f"  Entrenamiento: {len(train)} -> {args.train_out}")
     print(f"  Prueba:        {len(test)} ({len(test) / len(data):.1%}) -> {args.test_out}")
     print(f"  Positivos en prueba: {test_pos} · negativos en prueba: {n_test_neg}")
-    print(f"  Articulos de la prueba con otra redaccion en entrenamiento: "
-          f"{test_pos} de {test_pos}")
-    print("  Preguntas de la prueba repetidas en entrenamiento: 0")
+    print("  Sin fugas: cada articulo de la prueba tiene otra redaccion en entrenamiento")
     if test_pos < meta_pos:
         print(f"  OJO: solo {test_pos} positivos en prueba de {meta_pos} buscados: no hay "
               "suficientes articulos con 2 o mas redacciones (falta F4).")

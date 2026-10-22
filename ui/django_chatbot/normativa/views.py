@@ -7,7 +7,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from src.chat.pipeline import SIN_MODELO
+from src.chat.pipeline import ChatPipeline
 
 RAIZ = Path(__file__).resolve().parent.parent.parent.parent
 
@@ -67,11 +67,9 @@ def api_query(request):
         if not pregunta:
             return JsonResponse({"error": "Pregunta vacía."}, status=400)
 
-        modelo = _get_modelo()
-        if modelo is None or not modelo.is_available():
-            return JsonResponse({"answer": SIN_MODELO})
-        respuesta = modelo.chat([{"role": "user", "content": pregunta}])
-        return JsonResponse({"answer": respuesta})
+        # Pipeline nuevo en cada pregunta y sin historial (max_history 0).
+        respuesta = ChatPipeline(_get_modelo(), max_history=0).query(pregunta)
+        return JsonResponse({"answer": respuesta["answer"]})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 

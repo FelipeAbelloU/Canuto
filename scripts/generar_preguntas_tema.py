@@ -26,8 +26,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "scripts"))
 
-from build_dataset import _split_frontmatter, cargar_correcciones, cargar_clave, cargar_modificados
-from src.dataset.qa_builder import generate_heuristic, cita_key
+from build_dataset import cargar_documentos, cargar_correcciones, cargar_clave, cargar_modificados
+from src.dataset.qa_builder import generate_heuristic, cita_key, _de
 
 MODELO = "Qwen/Qwen2.5-7B-Instruct"
 MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -59,8 +59,10 @@ OPINION_RE = re.compile(r"\b(tu|su) (experiencia|historia)\b|\bhas visto\b|\bha 
 # Qwen a veces se pasa a otro idioma (salieron preguntas en chino).
 OTRO_IDIOMA_RE = re.compile(r"[^\x00-ɏ¿¡“”‘’–—…°ºª]")
 
+# Marca de los articulos largos partidos: "(parte 2 de 3) ...".
+PARTE_RE = re.compile(r"^\(parte \d+ de \d+\)\s*")
 # Articulos de vigencia o derogatorias: nadie pregunta por ellos.
-VIGENCIA_RE = re.compile(r"^(\(parte \d+ de \d+\)\s*)?(vigencia|el presente|la presente|rige)", re.IGNORECASE)
+VIGENCIA_RE = re.compile(r"^(vigencia|el presente|la presente|rige)", re.IGNORECASE)
 
 INSTRUCCION = """Este es un fragmento {de_nombre} de la Universidad de los Llanos:
 
@@ -88,13 +90,8 @@ def piezas():
             modificadores[por] = doc
 
     resultado = []
-    for ruta in sorted((RAIZ / "data/extracted").rglob("*.md")):
-        meta, body = _split_frontmatter(ruta.read_text(encoding="utf-8"))
-        fila = correcciones.get(meta.get("ruta_origen", ""))
-        if fila:
-            if fila["accion"] == "excluir":
-                continue
-            meta["numero"], meta["anio"] = fila["numero"], fila["anio"]
+    docs, _, _ = cargar_documentos(sorted((RAIZ / "data/extracted").rglob("*.md")), correcciones)
+    for _, meta, body in docs:
         key = cita_key(meta)
         viejos = modificados.get(key, {})   # articulos de este documento que ya cambiaron
         if key in clave:
@@ -115,7 +112,7 @@ def piezas():
             texto = par.answer.split("se establece:", 1)[1].strip()
             # Los articulos viejos (modificados) no: salen del documento que los cambio.
             articulo = re.search(r"artículo (\S+) d", par.question).group(1)
-            if VIGENCIA_RE.search(texto) or articulo in viejos:
+            if VIGENCIA_RE.search(PARTE_RE.sub("", texto)) or articulo in viejos:
                 continue
             resultado.append({"cita": par.question, "respuesta": par.answer, "texto": texto,
                               "nombre": nombre, "doc": key})
@@ -128,6 +125,7 @@ def cargar_qwen():
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
+    torch.manual_seed(SEMILLA)   # con temperatura: asi la generacion se puede repetir
     tokenizer = AutoTokenizer.from_pretrained(MODELO)
     modelo = AutoModelForCausalLM.from_pretrained(MODELO, quantization_config=quant, device_map="cuda")
     return modelo, tokenizer
@@ -140,10 +138,7 @@ def instruccion(pieza):
         extra = "\n- Cada pregunta debe decir que es de posgrado, maestría, especialización o doctorado."
     elif pieza["doc"] in FCBI:
         extra = "\n- Cada pregunta debe mencionar la Facultad de Ciencias Básicas e Ingeniería."
-    nombre = pieza["nombre"]
-    de_nombre = "del " + nombre[3:] if nombre.startswith("el ") else "de " + nombre
-    fragmento = re.sub(r"^\(parte \d+ de \d+\)\s*", "", pieza["texto"])
-    return INSTRUCCION.format(de_nombre=de_nombre, texto=fragmento, extra=extra)
+    return INSTRUCCION.format(de_nombre=_de(pieza["nombre"]), texto=PARTE_RE.sub("", pieza["texto"]), extra=extra)
 
 
 def preguntar(modelo, tokenizer, pieza):
@@ -250,8 +245,6 @@ def main():
     lista = piezas()
     print(f"Piezas de documentos clave: {len(lista)}")
 
-    import torch
-    torch.manual_seed(SEMILLA)
     modelo, tokenizer = cargar_qwen()
 
     preguntas = []

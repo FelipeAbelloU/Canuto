@@ -14,6 +14,7 @@ import re
 import csv
 import json
 import random
+from functools import lru_cache
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -22,7 +23,7 @@ import argparse
 from src.config_loader import load_config
 from src.dataset.qa_builder import (
     generate_heuristic, generate_negatives, generate_generales,
-    cita_key, ultimo_articulo, save_dataset, enmascarar, QAPair, _doc_ref, _gender
+    cita_key, cita_completa, ultimo_articulo, save_dataset, enmascarar, QAPair
 )
 
 # Semilla fija: los numeros falsos de los negativos salen siempre iguales.
@@ -57,6 +58,26 @@ def cargar_correcciones(ruta: Path) -> dict:
         return {}
     with open(ruta, encoding="utf-8") as f:
         return {fila["archivo"]: fila for fila in csv.DictReader(f, delimiter="\t")}
+
+
+def cargar_documentos(archivos: list[Path], correcciones: dict) -> tuple[list, set, int]:
+    """Lee los .md y les aplica las correcciones de citas. Lo usan este script y
+    generar_preguntas_tema.py, para que los dos vean los mismos documentos.
+
+    Devuelve ([(ruta, meta, cuerpo)], filas de correcciones usadas, excluidos).
+    """
+    docs, usadas, excluidos = [], set(), 0
+    for ruta in archivos:
+        meta, body = _split_frontmatter(ruta.read_text(encoding="utf-8"))
+        fila = correcciones.get(meta.get("ruta_origen", ""))
+        if fila:
+            usadas.add(fila["archivo"])
+            if fila["accion"] == "excluir":
+                excluidos += 1
+                continue
+            meta["numero"], meta["anio"] = fila["numero"], fila["anio"]
+        docs.append((ruta, meta, body))
+    return docs, usadas, excluidos
 
 
 def cargar_clave(ruta: Path) -> dict:
@@ -120,20 +141,9 @@ def main():
     # estan en el corpus. Si un documento esta repetido se queda el mayor.
     # Antes de indexar se corrigen las citas de los PDF mal nombrados.
     correcciones = cargar_correcciones(root / "config/correcciones_citas.tsv")
-    usadas = set()
-    excluidos = 0
-    docs = []
+    docs, usadas, excluidos = cargar_documentos(src_files, correcciones)
     indice: dict = {}
-    for src_path in src_files:
-        meta, body = _split_frontmatter(src_path.read_text(encoding="utf-8"))
-        fila = correcciones.get(meta.get("ruta_origen", ""))
-        if fila:
-            usadas.add(fila["archivo"])
-            if fila["accion"] == "excluir":
-                excluidos += 1
-                continue
-            meta["numero"], meta["anio"] = fila["numero"], fila["anio"]
-        docs.append((src_path, meta, body))
+    for _, meta, body in docs:
         key = cita_key(meta)
         indice[key] = max(indice.get(key, 0), ultimo_articulo(body))
     print(f"Correcciones de citas: {len(usadas)} de {len(correcciones)} aplicadas "
@@ -144,10 +154,7 @@ def main():
 
     # Documentos clave (tercera redaccion) y articulos modificados (nota en la
     # respuesta). Se avisa si alguna cita de las listas no esta en el corpus.
-    citas = {}   # (tipo, numero, año) -> "el Acuerdo Superior No. 9 de 2022"
-    for _, meta, _ in docs:
-        tipo, cita, _ = _doc_ref(meta)
-        citas[cita_key(meta)] = f"{_gender(tipo)[0]} {cita}"
+    citas = {cita_key(meta): cita_completa(meta) for _, meta, _ in docs}
     clave = cargar_clave(root / "config/documentos_clave.txt")
     modificados = {doc: {art: citas.get(por) for art, por in arts.items()}
                    for doc, arts in cargar_modificados(root / "config/articulos_modificados.tsv").items()}
@@ -211,8 +218,6 @@ def main():
         examen = {p["pregunta"] for p in json.load(f)}
     negativos = [p for p in negativos if p.question not in examen]
     all_pairs = [p for p in all_pairs if p.question not in examen]
-    for p in negativos:
-        p.familia = "negativo"
     n_negativos = len(negativos)
     all_pairs.extend(negativos)
 
@@ -227,10 +232,13 @@ def main():
     duplicados = len(all_pairs) - len(unique_pairs)
     all_pairs = unique_pairs
 
-    # Cedulas, pasaportes y codigos de estudiante -> "(dato reservado)".
+    # Cedulas, pasaportes y codigos de estudiante -> "(dato reservado)". Varias
+    # preguntas comparten la misma respuesta, asi que cada texto se enmascara
+    # una sola vez (era el 70 % del tiempo del script).
     enmascarados = 0
+    enmascarar_una_vez = lru_cache(maxsize=None)(enmascarar)
     for p in all_pairs:
-        q, a = enmascarar(p.question), enmascarar(p.answer)
+        q, a = enmascarar_una_vez(p.question), enmascarar_una_vez(p.answer)
         if (q, a) != (p.question, p.answer):
             enmascarados += 1
         p.question, p.answer = q, a

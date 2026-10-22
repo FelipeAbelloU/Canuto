@@ -56,6 +56,11 @@ def _gender(tipo_legible: str) -> tuple[str, str, str]:
     return ("la", "La", "de la")
 
 
+def _de(nombre: str) -> str:
+    """'de' + nombre, con la contraccion: 'el Estatuto' -> 'del Estatuto'."""
+    return "del " + nombre[3:] if nombre.startswith("el ") else "de " + nombre
+
+
 # Tipos que son legislacion NACIONAL, no normativa propia de Unillanos:
 # se citan sin "de Unillanos" para no atribuirle autoria equivocada.
 _NATIONAL_HINTS = ("NACIONAL", "MINISTERIO", "_MEN", "CONPES", "LEY", "ORDENANZA", "CESU")
@@ -442,8 +447,7 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
     plantillas = [f"¿Qué establece {{0}} {de_la} {cita}{suf_q}{{1}}?",
                   f"¿Qué dice {{0}} {de_la} {cita_simple}{{1}}?"]
     if nombre_clave:
-        de_nombre = "del " + nombre_clave[3:] if nombre_clave.startswith("el ") else "de " + nombre_clave
-        plantillas.append(f"¿Me puede explicar {{0}} {de_nombre} ({cita_simple}){{1}}?")
+        plantillas.append(f"¿Me puede explicar {{0}} {_de(nombre_clave)} ({cita_simple}){{1}}?")
     modificados = modificados or {}
 
     # El parser ya garantiza un numero UNICO y valido por articulo (los dudosos
@@ -514,6 +518,12 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
 # texto de otro documento. Todos los negativos empiezan igual ("No tengo
 # informacion" o "No puedo") para que sea facil reconocerlos al evaluar.
 
+def cita_completa(meta: dict) -> str:
+    """La cita con su articulo: 'el Acuerdo Superior No. 9 de 2022'."""
+    tipo, cita, _ = _doc_ref(meta)
+    return f"{_gender(tipo)[0]} {cita}"
+
+
 def cita_key(meta: dict) -> tuple[str, str, str]:
     """Llave de un documento en el indice: (tipo, numero sin ceros, año)."""
     numero = meta.get("numero", "").lstrip("0") or meta.get("numero", "")
@@ -525,6 +535,10 @@ def ultimo_articulo(body_md: str) -> int:
     st = _parse_structure(body_md)
     nums = [int(n) for n, _ in st.articles if n.isdigit()]
     return max(nums + [len(st.articles)])
+
+
+def _negativo(pregunta: str, respuesta: str) -> QAPair:
+    return QAPair(pregunta, respuesta, "negativo")
 
 
 def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
@@ -550,7 +564,7 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
     ultimo = indice.get(key, 0)
     if ultimo:
         falso = ultimo + rng.randint(5, 80)
-        pairs.append(QAPair(
+        pairs.append(_negativo(
             f"¿Qué establece el artículo {falso} {de_la} {cita}{suf_q}?",
             f"No tengo información sobre el artículo {falso} {de_la} {cita}. "
             f"Es posible que ese artículo no exista; te sugiero verificar el número del artículo.",
@@ -563,7 +577,7 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
     otro_anio = int(anio) + rng.choice([-3, -2, -1, 1, 2, 3])
     if (key[0], key[1], str(otro_anio)) not in indice:
         cita_mala = f"{tipo} No. {numero} de {otro_anio}"
-        pairs.append(QAPair(
+        pairs.append(_negativo(
             f"¿De qué trata {la} {cita_mala}{suf_q}?",
             f"No tengo información sobre {la} {cita_mala}. Conozco {la} {cita}, "
             f"así que es posible que el año no coincida; te sugiero verificarlo.",
@@ -573,7 +587,7 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
     otro_num = int(numero) + rng.randint(1, 40)
     if (key[0], str(otro_num), anio) not in indice:
         cita_mala = f"{tipo} No. {otro_num} de {anio}"
-        pairs.append(QAPair(
+        pairs.append(_negativo(
             f"¿Qué regula {la} {cita_mala}{suf_q}?",
             f"No tengo información sobre {la} {cita_mala}. "
             f"Te sugiero verificar el número y el año del documento.",
@@ -660,17 +674,17 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
 
     for u in OTRAS_UNIVERSIDADES:
         for plantilla in TEMAS_OTRAS:
-            pairs.append(QAPair(
+            pairs.append(_negativo(
                 plantilla.format(u=u),
                 f"No tengo información sobre la normativa de {u}. "
                 f"Solo conozco la normativa de la Universidad de los Llanos.",
             ))
 
     for q in UNILLANOS_FUERA:
-        pairs.append(QAPair(q, RESPUESTA_UNILLANOS_FUERA))
+        pairs.append(_negativo(q, RESPUESTA_UNILLANOS_FUERA))
 
     for q in DATOS_PRIVADOS:
-        pairs.append(QAPair(q, RESPUESTA_PRIVADOS))
+        pairs.append(_negativo(q, RESPUESTA_PRIVADOS))
 
     # Documentos imposibles: numero de 4 cifras y un año antes de que existiera
     # la universidad (1974) o muy en el futuro.
@@ -679,14 +693,14 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
         la, _, _ = _gender(tipo)
         anio = rng.choice([rng.randint(1900, 1970), rng.randint(2040, 2099)])
         cita = f"{tipo} No. {rng.randint(3000, 9999)} de {anio}"
-        pairs.append(QAPair(
+        pairs.append(_negativo(
             f"¿Qué dispone {la} {cita} de Unillanos?",
             f"No tengo información sobre {la} {cita}. "
             f"Te sugiero verificar el número y el año del documento.",
         ))
 
     for p in preguntas_generales:
-        pairs.append(QAPair(p["pregunta"], RESPUESTA_CULTURA))
+        pairs.append(_negativo(p["pregunta"], RESPUESTA_CULTURA))
 
     return pairs
 
