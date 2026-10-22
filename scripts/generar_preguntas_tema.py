@@ -15,6 +15,7 @@ es compartida. Tarda ~1 hora.
 
 Uso:
     python scripts/generar_preguntas_tema.py
+    python scripts/generar_preguntas_tema.py --refiltrar   # vuelve a filtrar sin Qwen
 """
 import json
 import re
@@ -47,6 +48,17 @@ FCBI_RE = re.compile(r"FCBI|Ciencias B[aá]sicas", re.IGNORECASE)
 # Una pregunta abierta no trae cita: ni "articulo 46" ni "Acuerdo 20 de 2021".
 CITA_RE = re.compile(r"art[ií]culo\s*\d|\b(acuerdo|resoluci[oó]n)\b[^?]{0,30}\d|\bde\s+(19|20)\d\d\b",
                      re.IGNORECASE)
+# Preguntas que solo se entienden leyendo el fragmento ("segun este acuerdo",
+# "estas actividades") o que le piden opinion o experiencia al bot.
+CONTEXTO_RE = re.compile(r"\b(este|esta|estos|estas|dicho|dicha)\s+(acuerdo|reglamento|estatuto|art[ií]culo|"
+                         r"fragmento|texto|documento|norma|resoluci[oó]n|modificaci[oó]n|actividades|procesos|"
+                         r"casos|requisitos|plan|sistema|recursos)\b|"
+                         r"seg[uú]n (el|este) (acuerdo|fragmento|texto|art[ií]culo)", re.IGNORECASE)
+OPINION_RE = re.compile(r"\b(tu|su) (experiencia|historia)\b|\bhas visto\b|\bha participado\b|\bcrees que\b|"
+                        r"\bopinas\b|\busted ha\b|\brecomendar[ií]as\b|\bcompart[ií] un caso\b", re.IGNORECASE)
+# Qwen a veces se pasa a otro idioma (salieron preguntas en chino).
+OTRO_IDIOMA_RE = re.compile(r"[^\x00-ɏ¿¡“”‘’–—…°ºª]")
+
 # Articulos de vigencia o derogatorias: nadie pregunta por ellos.
 VIGENCIA_RE = re.compile(r"^(\(parte \d+ de \d+\)\s*)?(vigencia|el presente|la presente|rige)", re.IGNORECASE)
 
@@ -150,9 +162,19 @@ def preguntar(modelo, tokenizer, pieza):
 
 
 def filtro(pregunta, doc):
-    """Devuelve "ok" o la razon por la que se descarta (filtros 1 a 3)."""
-    if not (pregunta.startswith("¿") and pregunta.endswith("?") and 15 <= len(pregunta) <= 200):
+    """Devuelve "ok" o la razon por la que se descarta (filtros 1 a 3).
+
+    La pregunta puede empezar contando el caso ("Si perdi una materia, ¿puedo...?"):
+    basta con que tenga el "¿" y termine en "?".
+    """
+    if not ("¿" in pregunta and pregunta.endswith("?") and 15 <= len(pregunta) <= 250):
         return "forma"
+    if OTRO_IDIOMA_RE.search(pregunta):
+        return "otro idioma"
+    if CONTEXTO_RE.search(pregunta):
+        return "depende del fragmento"
+    if OPINION_RE.search(pregunta):
+        return "pide opinion"
     if CITA_RE.search(pregunta):
         return "trae cita"
     if doc in POSGRADO and not NIVEL_RE.search(pregunta):
@@ -175,21 +197,52 @@ def quitar_choques(preguntas):
 
 
 def ida_y_vuelta(preguntas, lista_piezas):
-    """Filtro 5: la pregunta debe parecerse mas a su pieza que a las otras. Si su
-    pieza no queda entre las TOP_IDA_Y_VUELTA mas parecidas, es ambigua."""
+    """Filtro 5: la pregunta debe parecerse mas a su pieza que a las otras del
+    MISMO documento. Si su pieza no queda entre las TOP_IDA_Y_VUELTA mas
+    parecidas, es ambigua. Se compara dentro del documento porque entre
+    documentos (pregrado y posgrado tienen articulos casi iguales) ya decide la
+    regla de nivel; comparando contra todos se botaban preguntas claras."""
     from sentence_transformers import SentenceTransformer, util
     emb = SentenceTransformer(MODELO_EMBEDDINGS, device="cpu")
+    doc_de = {p["cita"]: p["doc"] for p in lista_piezas}
     citas = [p["cita"] for p in lista_piezas]
     v_piezas = emb.encode([p["texto"] for p in lista_piezas], convert_to_tensor=True)
     ok = [p for p in preguntas if p["filtro"] == "ok"]
     v_preg = emb.encode([p["pregunta"] for p in ok], convert_to_tensor=True)
     for p, sim in zip(ok, util.cos_sim(v_preg, v_piezas)):
-        top = [citas[i] for i in sim.argsort(descending=True)[:TOP_IDA_Y_VUELTA]]
-        if p["cita"] not in top:
+        mismo_doc = [i for i in sim.argsort(descending=True).tolist() if doc_de[citas[i]] == doc_de[p["cita"]]]
+        if p["cita"] not in [citas[i] for i in mismo_doc[:TOP_IDA_Y_VUELTA]]:
             p["filtro"] = "ambigua"
 
 
+def guardar_y_contar(preguntas):
+    with open(SALIDA, "w", encoding="utf-8") as f:
+        json.dump(preguntas, f, ensure_ascii=False, indent=2)
+    razones = {}
+    for p in preguntas:
+        razones[p["filtro"]] = razones.get(p["filtro"], 0) + 1
+    print(f"Preguntas: {len(preguntas)} -> {SALIDA}")
+    for razon, n in sorted(razones.items(), key=lambda x: -x[1]):
+        print(f"  {n:5d}  {razon}")
+
+
+def refiltrar():
+    """Vuelve a pasar los filtros a las preguntas ya generadas, sin Qwen ni GPU."""
+    lista = piezas()
+    doc_de = {p["cita"]: p["doc"] for p in lista}
+    with open(SALIDA, encoding="utf-8") as f:
+        preguntas = json.load(f)
+    for p in preguntas:
+        p["filtro"] = filtro(p["pregunta"], doc_de[p["cita"]]) if p["cita"] in doc_de else "sin pieza"
+    quitar_choques(preguntas)
+    ida_y_vuelta(preguntas, lista)
+    guardar_y_contar(preguntas)
+
+
 def main():
+    if "--refiltrar" in sys.argv:
+        refiltrar()
+        return
     if SALIDA.exists():
         print(f"Ya existe {SALIDA}: esta revisado a mano. Borralo a proposito si quieres regenerarlo.")
         sys.exit(1)
@@ -212,16 +265,7 @@ def main():
 
     quitar_choques(preguntas)
     ida_y_vuelta(preguntas, lista)
-
-    with open(SALIDA, "w", encoding="utf-8") as f:
-        json.dump(preguntas, f, ensure_ascii=False, indent=2)
-
-    razones = {}
-    for p in preguntas:
-        razones[p["filtro"]] = razones.get(p["filtro"], 0) + 1
-    print(f"Preguntas: {len(preguntas)} -> {SALIDA}")
-    for razon, n in sorted(razones.items(), key=lambda x: -x[1]):
-        print(f"  {n:5d}  {razon}")
+    guardar_y_contar(preguntas)
 
 
 if __name__ == "__main__":
