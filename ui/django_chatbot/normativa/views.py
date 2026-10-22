@@ -49,14 +49,15 @@ def index(request):
 
 def chat(request):
     """Chat en pantalla completa."""
-    # Preguntas de ejemplo de la bienvenida. Van con la cita del documento
-    # porque asi son las preguntas con las que se entreno el modelo. La ultima
-    # es de un articulo que no existe, para mostrar que reconoce lo que no sabe.
+    # Preguntas de ejemplo de la bienvenida, del Reglamento Estudiantil:
+    # requisitos de grado, cancelar cursos y nota para homologar. Van con la cita
+    # porque asi se entreno el modelo. La ultima es de un articulo que no
+    # existe, para mostrar que reconoce lo que no sabe.
     sugeridas = [
-        "¿Qué establece el artículo 1 de la Resolución Académica No. 126 de 2025 de Unillanos?",
-        "¿Qué establece el artículo 4 de la Resolución Académica No. 87 de 2022 de Unillanos?",
-        "¿Qué establece el artículo 1 de la Resolución Académica No. 27 de 2018 de Unillanos?",
-        "¿Qué establece el artículo 500 del Acuerdo Superior No. 007 de 1990 de Unillanos?",
+        "¿Qué establece el artículo 61 del Acuerdo Superior 20 de 2021?",
+        "¿Qué dice el artículo 38 del Acuerdo Superior 20 de 2021?",
+        "¿Qué establece el artículo 46 del Acuerdo Superior 20 de 2021?",
+        "¿Qué establece el artículo 500 del Acuerdo Superior No. 007 de 1990?",
     ]
     modelo = _get_modelo()
     return render(request, "normativa/chat.html", {

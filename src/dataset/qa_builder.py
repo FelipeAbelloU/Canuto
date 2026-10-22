@@ -463,28 +463,23 @@ def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
                 pairs.append(QAPair(pregunta[:-1] + parte + "?", f"{inicio}{parte} {trozo}{fin}"))
 
     # ── 3. Fallback: documentos sin articulos (actas, comunicados) ────────
+    # Antes se cortaban en seco a los 1.200 caracteres (a mitad de palabra); ahora
+    # se parten igual que los articulos largos.
+    # La pregunta "¿Desde cuando rige?" se quito: casi siempre decia "a partir de
+    # la fecha de su expedicion" sin la fecha, y ya esta en el articulo de vigencia.
     if not st.articles:
         cuerpo = st.resuelve or st.considerando or st.descripcion
-        if cuerpo:
-            if not st.descripcion:
-                pairs.append(QAPair(
-                    f"¿Qué dispone {la} {cita}{suf_q}?",
-                    f"{La} {cita}{entidad} dispone: {cuerpo[:1200]}",
-                ))
-            if st.considerando:
-                pairs.append(QAPair(
-                    f"¿Cuál es el fundamento {de_la} {cita}{suf_q}?",
-                    f"{La} {cita}{entidad} considera: {st.considerando[:1200]}",
-                ))
-
-    # ── 4. Vigencia (si aparece explicita) ────────────────────────────────
-    vig = re.search(r"(rige\s+a\s+partir[^.\n]{5,160}|entrar[áa]?\s+en\s+vigen[^.\n]{5,160})",
-                    body_md, re.IGNORECASE)
-    if vig:
-        pairs.append(QAPair(
-            f"¿Desde cuándo rige {la} {cita}{suf_q}?",
-            f"{La} {cita}{entidad} {vig.group(1).strip()}.",
-        ))
+        unidades = []
+        if cuerpo and not st.descripcion:
+            unidades.append((f"¿Qué dispone {la} {cita}{suf_q}?", f"{La} {cita}{entidad} dispone:", cuerpo))
+        if cuerpo and st.considerando:
+            unidades.append((f"¿Cuál es el fundamento {de_la} {cita}{suf_q}?",
+                             f"{La} {cita}{entidad} considera:", st.considerando))
+        for pregunta, inicio, texto in unidades:
+            trozos = _trozos(texto, LIMITE_RESPUESTA - len(inicio))
+            for i, trozo in enumerate(trozos, 1):
+                parte = f" (parte {i} de {len(trozos)})" if len(trozos) > 1 else ""
+                pairs.append(QAPair(pregunta[:-1] + parte + "?", f"{inicio}{parte} {trozo}"))
 
     return pairs
 
@@ -627,8 +622,8 @@ RESPUESTA_PRIVADOS = (
 TIPOS_FALSOS = ["Acuerdo Superior", "Acuerdo Académico", "Resolución Superior",
                 "Resolución Académica", "Resolución Rectoral"]
 
-CIERRE_GENERAL = (" Sin embargo, mi propósito es responder preguntas sobre la normativa "
-                  "de la Universidad de los Llanos.")
+RESPUESTA_CULTURA = ("No puedo ayudarte con eso: solo respondo sobre la normativa de la "
+                     "Universidad de los Llanos (acuerdos, resoluciones, reglamentos y estatutos).")
 
 
 def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 150) -> list[QAPair]:
@@ -636,8 +631,8 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
     de Unillanos que no estan en el corpus, datos privados, documentos con
     numeros o años imposibles y cultura general.
 
-    La cultura general NO es un "no se": se contesta y al final se recuerda
-    para que sirve CANUTO. Las respuestas vienen de preguntas_generales.json.
+    La cultura general se rechaza siempre con la misma respuesta: CANUTO solo
+    responde sobre normativa. Las preguntas vienen de preguntas_generales.json.
     """
     pairs: list[QAPair] = []
 
@@ -669,7 +664,7 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
         ))
 
     for p in preguntas_generales:
-        pairs.append(QAPair(p["pregunta"], p["respuesta"] + CIERRE_GENERAL))
+        pairs.append(QAPair(p["pregunta"], RESPUESTA_CULTURA))
 
     return pairs
 
