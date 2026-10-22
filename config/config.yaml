@@ -40,6 +40,9 @@ dataset:
   input_dir: "data/extracted"
   output_dir: "data/dataset"
 
-# Chat: cuantos turnos anteriores recuerda la conversacion.
+# Chat por terminal: cuantos turnos anteriores se le envian al modelo. En 0
+# porque el modelo se entrena con una pregunta a la vez (no hay ejemplos de
+# seguimiento). La web no lo usa: guarda las conversaciones en el navegador y
+# tambien manda solo la pregunta nueva.
 chat:
-  max_history: 5
+  max_history: 0

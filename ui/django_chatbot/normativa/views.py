@@ -7,18 +7,19 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from src.chat.pipeline import SIN_MODELO
+
 RAIZ = Path(__file__).resolve().parent.parent.parent.parent
 
-# El modelo se carga una sola vez porque pesa varios GB, pero cada usuario tiene
-# su propia conversacion para que no se le mezcle el historial con el de otro.
+# El modelo se carga una sola vez porque pesa varios GB. Las conversaciones las
+# guarda el navegador (chat.html); el modelo recibe solo la pregunta nueva,
+# porque se entreno con una pregunta a la vez.
 _modelo = None
-_max_history = 5
-_conversaciones = {}
 
 
 def _get_modelo():
     """Carga el modelo la primera vez que se necesita."""
-    global _modelo, _max_history
+    global _modelo
     if _modelo is None:
         from src.config_loader import load_config
         from src.factory import create_model
@@ -28,18 +29,8 @@ def _get_modelo():
         ruta = config.get("model", {}).get("checkpoint_path", "")
         if ruta and not Path(ruta).is_absolute():
             config["model"]["checkpoint_path"] = str(RAIZ / ruta)
-        _max_history = config.get("chat", {}).get("max_history", 5)
         _modelo = create_model(config)
     return _modelo
-
-
-def _get_chat(usuario):
-    """Devuelve el chat de ese usuario y lo crea si es su primera pregunta."""
-    if usuario not in _conversaciones:
-        from src.chat.pipeline import ChatPipeline
-        modelo = _get_modelo()
-        _conversaciones[usuario] = ChatPipeline(modelo, _max_history)
-    return _conversaciones[usuario]
 
 
 def index(request):
@@ -49,14 +40,14 @@ def index(request):
 
 def chat(request):
     """Chat en pantalla completa."""
-    # Preguntas de ejemplo de la bienvenida, del Reglamento Estudiantil:
-    # requisitos de grado, cancelar cursos y nota para homologar. Van con la cita
-    # porque asi se entreno el modelo. La ultima es de un articulo que no
-    # existe, para mostrar que reconoce lo que no sabe.
+    # Preguntas de ejemplo de la bienvenida, del Reglamento Estudiantil (AS 20 de
+    # 2021): dos abiertas (arts. 46 y 61) y una con cita (art. 38), para mostrar
+    # las dos formas de preguntar. La ultima es de un articulo que no existe,
+    # para mostrar que reconoce lo que no sabe.
     sugeridas = [
-        "¿Qué establece el artículo 61 del Acuerdo Superior 20 de 2021?",
+        "¿Cuál es la nota mínima para homologar una materia?",
+        "¿Cuáles son los requisitos de grado?",
         "¿Qué dice el artículo 38 del Acuerdo Superior 20 de 2021?",
-        "¿Qué establece el artículo 46 del Acuerdo Superior 20 de 2021?",
         "¿Qué establece el artículo 500 del Acuerdo Superior No. 007 de 1990?",
     ]
     modelo = _get_modelo()
@@ -76,16 +67,11 @@ def api_query(request):
         if not pregunta:
             return JsonResponse({"error": "Pregunta vacía."}, status=400)
 
-        resultado = _get_chat(data.get("user_id", "anonimo")).query(pregunta)
-        return JsonResponse({"answer": resultado["answer"]})
+        modelo = _get_modelo()
+        if modelo is None or not modelo.is_available():
+            return JsonResponse({"answer": SIN_MODELO})
+        respuesta = modelo.chat([{"role": "user", "content": pregunta}])
+        return JsonResponse({"answer": respuesta})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-
-@csrf_exempt
-@require_POST
-def api_reset(request):
-    """Borra el historial de ese usuario para empezar una conversacion nueva."""
-    data = json.loads(request.body or "{}")
-    _get_chat(data.get("user_id", "anonimo")).reset_history()
-    return JsonResponse({"status": "ok"})

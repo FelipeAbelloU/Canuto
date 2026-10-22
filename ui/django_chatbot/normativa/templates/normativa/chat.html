@@ -28,7 +28,8 @@
       </button>
     </div>
 
-    <div class="flex-1"></div>
+    <!-- Conversaciones guardadas en el navegador (las pinta pintarLista) -->
+    <div id="lista-conversaciones" class="flex-1 overflow-y-auto px-3 space-y-1"></div>
 
     <div class="p-3 border-t border-gray-200 dark:border-neutral-800 space-y-2">
       <a href="{% url 'index' %}"
@@ -161,6 +162,78 @@
     document.getElementById('chat-messages').scrollTop = 99999;
   }
 
+  // --- Conversaciones -------------------------------------------------------
+  // Se guardan en el navegador (localStorage), como en ChatGPT: "Nueva
+  // conversacion" abre una vacia sin borrar las anteriores. El modelo NO las
+  // recibe: contesta cada pregunta por separado, como se entreno.
+  const CLAVE = 'canuto-conversaciones';
+  const MAX_CONVERSACIONES = 20;   // al pasarse se borra la mas vieja
+  let actual = null;               // id de la conversacion abierta (null = vacia)
+
+  // Si el navegador bloquea localStorage, el chat funciona igual sin guardar.
+  function leerConversaciones() {
+    try { return JSON.parse(localStorage.getItem(CLAVE)) || []; } catch (e) { return []; }
+  }
+  function escribirConversaciones(lista) {
+    try { localStorage.setItem(CLAVE, JSON.stringify(lista.slice(0, MAX_CONVERSACIONES))); } catch (e) {}
+  }
+
+  // Agrega un mensaje a la conversacion `id` (si es null la crea, con la
+  // pregunta como titulo). La conversacion usada sube al principio de la lista.
+  function guardarMensaje(id, rol, texto) {
+    const lista = leerConversaciones();
+    let conv = lista.find(c => c.id === id);
+    if (!conv) conv = { id: Date.now().toString(36), titulo: texto.slice(0, 40), mensajes: [] };
+    conv.mensajes.push({ rol, texto });
+    escribirConversaciones([conv, ...lista.filter(c => c.id !== conv.id)]);
+    pintarLista();
+    return conv.id;
+  }
+
+  // Dibuja la lista de la barra lateral, con la abierta resaltada.
+  function pintarLista() {
+    const caja = document.getElementById('lista-conversaciones');
+    caja.innerHTML = '';
+    leerConversaciones().forEach(c => {
+      const fila = document.createElement('div');
+      fila.className = 'group flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs cursor-pointer ' +
+        (c.id === actual ? 'bg-red-100 dark:bg-red-900/40 text-gray-900 dark:text-white'
+                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-800');
+      fila.innerHTML = `<span class="flex-1 truncate" title="${escaparHtml(c.titulo)}">${escaparHtml(c.titulo)}</span>
+        <button class="hidden group-hover:block hover:text-red-600 px-1" title="Borrar">×</button>`;
+      fila.onclick = () => abrirConversacion(c.id);
+      fila.querySelector('button').onclick = (e) => { e.stopPropagation(); borrarConversacion(c.id); };
+      caja.appendChild(fila);
+    });
+  }
+
+  // Quita los mensajes de la pantalla y vuelve a mostrar la bienvenida.
+  function limpiarPantalla() {
+    Array.from(contenedor().children).forEach(el => { if (el.id !== 'welcome-screen') el.remove(); });
+    document.getElementById('welcome-screen').classList.remove('hidden');
+  }
+
+  function abrirConversacion(id) {
+    const conv = leerConversaciones().find(c => c.id === id);
+    if (!conv) return;
+    actual = id;
+    limpiarPantalla();
+    conv.mensajes.forEach(m => agregarMensaje(m.rol, m.texto));
+    pintarLista();
+  }
+
+  function nuevaConversacion() {
+    actual = null;
+    limpiarPantalla();
+    pintarLista();
+    document.getElementById('chat-input').focus();
+  }
+
+  function borrarConversacion(id) {
+    escribirConversaciones(leerConversaciones().filter(c => c.id !== id));
+    if (id === actual) nuevaConversacion(); else pintarLista();
+  }
+
   // Envia la pregunta al servidor y muestra la respuesta.
   async function enviarPregunta() {
     const input = document.getElementById('chat-input');
@@ -170,24 +243,29 @@
     input.value = '';
     input.disabled = true;
     agregarMensaje('user', pregunta);
+    // Se recuerda el id: si mientras responde el usuario abre otra
+    // conversacion, la respuesta se guarda en la que hizo la pregunta.
+    const id = actual = guardarMensaje(actual, 'user', pregunta);
+    pintarLista();
     mostrarEscribiendo();
 
+    let respuesta;
     try {
       const res = await fetch('/api/query/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: pregunta, user_id: getUserId() })
+        body: JSON.stringify({ question: pregunta })
       });
       const data = await res.json();
-      document.getElementById('escribiendo')?.remove();
-      agregarMensaje('assistant', data.answer || data.error || 'No se pudo obtener la respuesta.');
+      respuesta = data.answer || data.error || 'No se pudo obtener la respuesta.';
     } catch (e) {
-      document.getElementById('escribiendo')?.remove();
-      agregarMensaje('assistant', 'Error de conexión. Verifica que el servidor esté activo.');
-    } finally {
-      input.disabled = false;
-      input.focus();
+      respuesta = 'Error de conexión. Verifica que el servidor esté activo.';
     }
+    document.getElementById('escribiendo')?.remove();
+    guardarMensaje(id, 'assistant', respuesta);
+    if (actual === id) agregarMensaje('assistant', respuesta);
+    input.disabled = false;
+    input.focus();
   }
 
   function enviarSugerencia(texto) {
@@ -195,15 +273,6 @@
     enviarPregunta();
   }
 
-  // Limpia la pantalla y borra el historial que guarda el servidor.
-  function nuevaConversacion() {
-    Array.from(contenedor().children).forEach(el => { if (!el.id) el.remove(); });
-    document.getElementById('welcome-screen').classList.remove('hidden');
-    fetch('/api/reset/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: getUserId() })
-    });
-  }
+  pintarLista();
 </script>
 {% endblock %}
