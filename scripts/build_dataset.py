@@ -181,20 +181,23 @@ def main():
         all_pairs.extend(pairs)
         negativos.extend(negs)
 
-    # Familia B: preguntas abiertas de los documentos clave (las escribio Qwen con
-    # generar_preguntas_tema.py). Cada una lleva la pregunta con cita de su
-    # articulo, y con ella se toma la MISMA respuesta de la familia A.
-    ruta_b = root / "data/dataset/preguntas_tema.json"
-    if ruta_b.exists():
-        respuesta_de = {p.question: p.answer for p in all_pairs}
-        with open(ruta_b, encoding="utf-8") as f:
-            tema = [p for p in json.load(f) if p["filtro"] == "ok"]
-        sin_articulo = [p for p in tema if p["cita"] not in respuesta_de]
-        all_pairs.extend(QAPair(p["pregunta"], respuesta_de[p["cita"]], "B")
-                         for p in tema if p["cita"] in respuesta_de)
-        print(f"\nPreguntas abiertas (familia B): {len(tema) - len(sin_articulo)}")
-        if sin_articulo:
-            print(f"  OJO: {len(sin_articulo)} no encontraron su articulo (¿cambio el generador?)")
+    # Preguntas abiertas de los documentos clave: B las escribio Qwen
+    # (generar_preguntas_tema.py) y E son las frecuentes, escritas a mano. Cada
+    # una lleva la pregunta con cita de su articulo ("cita"), y con ella se toma
+    # la MISMA respuesta de la familia A.
+    respuesta_de = {p.question: p.answer for p in all_pairs}
+    for archivo, familia in [("preguntas_tema.json", "B"), ("preguntas_frecuentes.json", "E")]:
+        ruta = root / "data/dataset" / archivo
+        if not ruta.exists():
+            continue
+        with open(ruta, encoding="utf-8") as f:
+            abiertas = [p for p in json.load(f) if p.get("filtro", "ok") == "ok"]
+        sin_articulo = [p for p in abiertas if p["cita"] not in respuesta_de]
+        all_pairs.extend(QAPair(p["pregunta"], respuesta_de[p["cita"]], familia)
+                         for p in abiertas if p["cita"] in respuesta_de)
+        print(f"Preguntas abiertas (familia {familia}): {len(abiertas) - len(sin_articulo)}")
+        for p in sin_articulo:
+            print(f"  OJO: no se encontro el articulo de: {p['pregunta']}")
 
     # Negativos que no salen de ningun documento (otras universidades, datos
     # privados, cultura general...).

@@ -56,9 +56,9 @@ def main():
     train, test = [], []
     for grupo in grupos:
         if len(test) < meta_pos and len(grupo) >= 2:
-            # Si el articulo tiene preguntas abiertas (B), va una de ellas: es
-            # como pregunta un estudiante real, sin citar el articulo.
-            abiertas = [i for i, r in enumerate(grupo) if r.get("familia") == "B"]
+            # Si el articulo tiene preguntas abiertas (B o E), va una de ellas:
+            # es como pregunta un estudiante real, sin citar el articulo.
+            abiertas = [i for i, r in enumerate(grupo) if r.get("familia") in ("B", "E")]
             elegida = rng.choice(abiertas) if abiertas else rng.randrange(len(grupo))
             test.append(grupo[elegida])
             train.extend(r for i, r in enumerate(grupo) if i != elegida)
