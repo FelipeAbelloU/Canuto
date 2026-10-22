@@ -115,9 +115,9 @@ def parse_args():
 # --------------------------------------------------------------------------- #
 # Paso 1: generar las respuestas (necesita el modelo cargado)
 # --------------------------------------------------------------------------- #
-def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device):
+def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device, system_prompt):
     """Un forward pass sobre (pregunta + respuesta de referencia), en el MISMO
-    formato user/assistant con el que entrena train_gpu.py y sin system prompt.
+    formato con el que entrena train_gpu.py (system prompt + user/assistant).
 
     Devuelve (perdida, entropia) sobre los tokens de la respuesta. La perplejidad
     se calcula despues como exp(media de las perdidas), que es mas estable. Se
@@ -126,7 +126,8 @@ def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device):
     """
     import torch
 
-    base = [{"role": "user", "content": pregunta}]
+    base = [{"role": "system", "content": system_prompt},
+            {"role": "user", "content": pregunta}]
     completo = base + [{"role": "assistant", "content": respuesta}]
     texto_prompt = tokenizer.apply_chat_template(base, tokenize=False, add_generation_prompt=True)
     texto_completo = tokenizer.apply_chat_template(completo, tokenize=False,
@@ -212,7 +213,8 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
     print("Calculando perdida y entropia...")
     for i, caso in enumerate(casos, 1):
         nll, ent = perdida_entropia(modelo.hf_model, modelo.tokenizer,
-                                    caso["pregunta"], caso["referencia"], modelo.device)
+                                    caso["pregunta"], caso["referencia"], modelo.device,
+                                    modelo.system_prompt)
         caso["perdida"] = nll
         caso["entropia"] = ent
         print(f"  {i}/{len(casos)}", end="\r")

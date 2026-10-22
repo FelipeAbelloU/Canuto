@@ -23,6 +23,9 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(RAIZ))
+
+from src.config_loader import load_config
 
 # ===========================================================================
 # HIPERPARAMETROS DE LA CORRIDA  --  editar a mano antes de entrenar
@@ -159,16 +162,17 @@ def accuracy_tokens(evaluacion):
     return {"accuracy_tokens": float(aciertos.sum() / reales.sum())}
 
 
-def cargar_textos(path, tokenizer):
+def cargar_textos(path, tokenizer, system_prompt):
     """Pasa los pares {instruction, output} al formato de chat de Qwen2.5.
 
-    Sin system prompt: el modelo se entrena y responde solo user/assistant.
+    Con el system prompt de config.yaml, el mismo que usan el chat y evaluate.py.
     """
     with open(path, encoding="utf-8") as f:
         records = json.load(f)
     textos = []
     for r in records:
         messages = [
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": r["instruction"]},
             {"role": "assistant", "content": r["output"]},
         ]
@@ -210,7 +214,9 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     print("[2/4] Dataset...")
-    textos = cargar_textos(DATASET_TRAIN, tokenizer)
+    system_prompt = load_config(str(RAIZ / "config/config.yaml"))["model"]["system_prompt"]
+    textos = cargar_textos(DATASET_TRAIN, tokenizer, system_prompt)
+    print(f"      system prompt: {system_prompt[:60]}...")
     random.Random(SEMILLA_VALIDACION).shuffle(textos)
     n_val = max(1, int(len(textos) * FRACCION_VALIDACION))
     ds_val = Dataset.from_list(textos[:n_val])

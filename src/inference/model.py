@@ -10,12 +10,14 @@ class FineTunedModel:
         max_new_tokens: int = 512,
         temperature: float = 0.3,
         top_p: float = 0.85,
+        system_prompt: str = "",
     ):
         self.checkpoint_path = checkpoint_path
         self.device = device
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.top_p = top_p
+        self.system_prompt = system_prompt
         self._model = None
         self._tokenizer = None
 
@@ -97,6 +99,9 @@ class FineTunedModel:
         self._load()
         import torch
 
+        # El system prompt va siempre primero, igual que en el entrenamiento.
+        if self.system_prompt:
+            messages = [{"role": "system", "content": self.system_prompt}] + messages
         text = self._tokenizer.apply_chat_template(
             messages,
             tokenize=False,

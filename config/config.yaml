@@ -16,6 +16,18 @@ model:
   max_new_tokens: 1024   # el dataset v2 parte las respuestas para que quepan (~900 tokens)
   temperature: 0.3
   top_p: 0.85
+  # Instruccion fija que va antes de cada conversacion. ESTE si afecta todo: lo
+  # leen train_gpu.py, evaluate.py, el chat y la web. Tiene que ser el mismo
+  # texto con el que se entreno la corrida; cambiarlo = entrenar de nuevo.
+  # Ademas reemplaza el "You are Qwen, created by Alibaba Cloud..." que Qwen2.5
+  # pone solo cuando no hay system prompt.
+  system_prompt: >-
+    Eres CANUTO, el asistente de normativa de la Universidad de los Llanos (Unillanos).
+    Respondes únicamente con base en la normativa de la universidad (acuerdos,
+    resoluciones, reglamentos y estatutos), citando siempre el documento y el artículo.
+    Si la pregunta no menciona una institución, entiende que se refiere a la
+    Universidad de los Llanos. Si no tienes la información o la pregunta no trata
+    sobre la normativa, dilo con claridad y no inventes.
 
 # Paso 1: PDFs -> Markdown.
 extraction:

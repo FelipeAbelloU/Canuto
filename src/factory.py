@@ -21,6 +21,7 @@ def create_model(config: dict, checkpoint: str = None):
         max_new_tokens=cfg.get("max_new_tokens", 512),
         temperature=cfg.get("temperature", 0.3),
         top_p=cfg.get("top_p", 0.85),
+        system_prompt=cfg.get("system_prompt", ""),
     )
 
 
