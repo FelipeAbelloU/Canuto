@@ -336,28 +336,14 @@ def _doc_ref(meta: dict) -> tuple[str, str, str]:
 # Con 2.000 caracteres la respuesta mas larga del corpus queda en 972 tokens.
 LIMITE_RESPUESTA = 2000
 
-# Palabras para decir de que es la tabla que se quita.
-_TEMAS_TABLA = [
-    ("calendario", "el calendario"),
-    ("plan de estudio", "el plan de estudios"),
-    ("tarifa", "las tarifas"),
-    ("presupuesto", "el presupuesto"),
-    ("rubro", "el presupuesto"),
-    ("estudiante", "el listado de estudiantes"),
-    ("valor", "los valores"),
-]
-
 
 def _quitar_tabla(texto: str, documento: str) -> tuple[str, str]:
     """Quita la tabla (lo que va entre la primera y la ultima "|") y devuelve
     (texto sin la tabla, frase que remite al documento)."""
     ini, fin = texto.find("|"), texto.rfind("|")
-    tema = "información adicional"
-    for clave, nombre in _TEMAS_TABLA:
-        if clave in texto.lower():
-            tema = nombre
-            break
-    aviso = f" Este artículo incluye una tabla con {tema}; para el detalle consulta {documento}."
+    # Una frase fija: antes se adivinaba el tema de la tabla buscando palabras
+    # ("estudiante", "valor") en todo el articulo y salian etiquetas falsas.
+    aviso = f" Este artículo incluye una tabla; para el detalle consulta {documento}."
     return (texto[:ini] + " " + texto[fin + 1:]).strip(), aviso
 
 

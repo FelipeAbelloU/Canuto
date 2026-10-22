@@ -179,14 +179,14 @@
   }
 
   // Agrega un mensaje a la conversacion `id` (si es null la crea, con la
-  // pregunta como titulo). La conversacion usada sube al principio de la lista.
+  // pregunta como titulo). La conversacion usada sube al principio de la lista;
+  // quien llama vuelve a pintar la lista.
   function guardarMensaje(id, rol, texto) {
     const lista = leerConversaciones();
     let conv = lista.find(c => c.id === id);
     if (!conv) conv = { id: Date.now().toString(36), titulo: texto.slice(0, 40), mensajes: [] };
     conv.mensajes.push({ rol, texto });
     escribirConversaciones([conv, ...lista.filter(c => c.id !== conv.id)]);
-    pintarLista();
     return conv.id;
   }
 
@@ -263,6 +263,7 @@
     }
     document.getElementById('escribiendo')?.remove();
     guardarMensaje(id, 'assistant', respuesta);
+    pintarLista();
     if (actual === id) agregarMensaje('assistant', respuesta);
     input.disabled = false;
     input.focus();

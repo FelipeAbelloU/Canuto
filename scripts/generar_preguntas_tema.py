@@ -6,7 +6,8 @@ Qwen solo escribe PREGUNTAS: la respuesta es siempre el texto real del articulo,
 la misma de las preguntas con cita, asi que no puede inventar nada.
 
 Las preguntas pasan por filtros (forma, sin cita, nivel pregrado/posgrado, sin
-choques entre articulos y que apunten a su articulo) y se guardan en
+choques entre articulos y que apunten a su articulo) y por un juez: Qwen dice
+SI o NO a si el fragmento responde la pregunta. Se guardan en
 data/dataset/preguntas_tema.json, que se versiona en git y se revisa a mano.
 build_dataset.py usa solo las que tienen "filtro": "ok".
 
@@ -16,6 +17,7 @@ es compartida. Tarda ~1 hora.
 Uso:
     python scripts/generar_preguntas_tema.py
     python scripts/generar_preguntas_tema.py --refiltrar   # vuelve a filtrar sin Qwen
+    python scripts/generar_preguntas_tema.py --juez        # Qwen revisa las "ok" (~15 min, GPU)
 """
 import json
 import re
@@ -63,6 +65,14 @@ OTRO_IDIOMA_RE = re.compile(r"[^\x00-ɏ¿¡“”‘’–—…°ºª]")
 PARTE_RE = re.compile(r"^\(parte \d+ de \d+\)\s*")
 # Articulos de vigencia o derogatorias: nadie pregunta por ellos.
 VIGENCIA_RE = re.compile(r"^(vigencia|el presente|la presente|rige)", re.IGNORECASE)
+
+JUEZ = """Fragmento {de_nombre} de la Universidad de los Llanos:
+
+"{texto}"
+
+Pregunta: "{pregunta}"
+
+¿El fragmento responde directamente esta pregunta, sin necesitar información de otra parte? Contesta solo SÍ o NO."""
 
 INSTRUCCION = """Este es un fragmento {de_nombre} de la Universidad de los Llanos:
 
@@ -231,12 +241,54 @@ def refiltrar():
         p["filtro"] = filtro(p["pregunta"], doc_de[p["cita"]]) if p["cita"] in doc_de else "sin pieza"
     quitar_choques(preguntas)
     ida_y_vuelta(preguntas, lista)
+    aplicar_juez(preguntas)
+    guardar_y_contar(preguntas)
+
+
+def aplicar_juez(preguntas):
+    """Las que el juez ya rechazo no vuelven a ser "ok" al refiltrar."""
+    for p in preguntas:
+        if p["filtro"] == "ok" and p.get("juez") == "no":
+            p["filtro"] = "juez dijo no"
+
+
+def juzgar():
+    """Filtro 6: Qwen lee el fragmento y la pregunta y dice si la responde. El
+    embedding solo mide si se parecen; esto atrapa, por ejemplo, "expulsion"
+    contestada con un articulo de "suspension". Solo revisa las "ok" que no
+    tienen veredicto todavia y guarda el veredicto en "juez"."""
+    import torch
+    lista = {p["cita"]: p for p in piezas()}
+    with open(SALIDA, encoding="utf-8") as f:
+        preguntas = json.load(f)
+    pendientes = [p for p in preguntas if p["filtro"] == "ok" and "juez" not in p]
+    print(f"Preguntas para el juez: {len(pendientes)}")
+    modelo, tokenizer = cargar_qwen()
+    for i, p in enumerate(pendientes, 1):
+        pieza = lista[p["cita"]]
+        texto = JUEZ.format(de_nombre=_de(pieza["nombre"]), texto=PARTE_RE.sub("", pieza["texto"]),
+                            pregunta=p["pregunta"])
+        prompt = tokenizer.apply_chat_template([{"role": "user", "content": texto}],
+                                               tokenize=False, add_generation_prompt=True)
+        entrada = tokenizer([prompt], return_tensors="pt").to("cuda")
+        with torch.no_grad():   # greedy: el mismo veredicto cada vez
+            salida = modelo.generate(**entrada, max_new_tokens=3, do_sample=False,
+                                     pad_token_id=tokenizer.eos_token_id)
+        veredicto = tokenizer.decode(salida[0][entrada["input_ids"].shape[-1]:], skip_special_tokens=True)
+        # Cualquier cosa que no empiece por "S" (NO, o una respuesta rara) se descarta.
+        p["juez"] = "si" if veredicto.strip().upper().startswith("S") else "no"
+        print(f"  {i}/{len(pendientes)}", end="\r")
+    print()
+    aplicar_juez(preguntas)
     guardar_y_contar(preguntas)
 
 
 def main():
     if "--refiltrar" in sys.argv:
         refiltrar()
+        return
+    if "--juez" in sys.argv:
+        juzgar()
         return
     if SALIDA.exists():
         print(f"Ya existe {SALIDA}: esta revisado a mano. Borralo a proposito si quieres regenerarlo.")
