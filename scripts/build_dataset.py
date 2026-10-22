@@ -154,6 +154,8 @@ def main():
     with open(root / "data/dataset/preguntas_fuera_dominio.json", encoding="utf-8") as f:
         examen = {p["pregunta"] for p in json.load(f)}
     negativos = [p for p in negativos if p.question not in examen]
+    for p in negativos:
+        p.familia = "negativo"
     n_negativos = len(negativos)
     all_pairs.extend(negativos)
 

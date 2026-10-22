@@ -18,10 +18,12 @@ from dataclasses import dataclass, field
 class QAPair:
     question: str
     answer: str
+    familia: str = "A"   # A (con cita) o "negativo"; lo usa split_dataset.py
 
 
 def to_alpaca(pair: QAPair) -> dict:
-    return {"instruction": pair.question, "input": "", "output": pair.answer}
+    return {"instruction": pair.question, "input": "", "output": pair.answer,
+            "familia": pair.familia}
 
 
 # ---------------------------------------------------------------------------
