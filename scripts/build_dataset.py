@@ -181,6 +181,21 @@ def main():
         all_pairs.extend(pairs)
         negativos.extend(negs)
 
+    # Familia B: preguntas abiertas de los documentos clave (las escribio Qwen con
+    # generar_preguntas_tema.py). Cada una lleva la pregunta con cita de su
+    # articulo, y con ella se toma la MISMA respuesta de la familia A.
+    ruta_b = root / "data/dataset/preguntas_tema.json"
+    if ruta_b.exists():
+        respuesta_de = {p.question: p.answer for p in all_pairs}
+        with open(ruta_b, encoding="utf-8") as f:
+            tema = [p for p in json.load(f) if p["filtro"] == "ok"]
+        sin_articulo = [p for p in tema if p["cita"] not in respuesta_de]
+        all_pairs.extend(QAPair(p["pregunta"], respuesta_de[p["cita"]], "B")
+                         for p in tema if p["cita"] in respuesta_de)
+        print(f"\nPreguntas abiertas (familia B): {len(tema) - len(sin_articulo)}")
+        if sin_articulo:
+            print(f"  OJO: {len(sin_articulo)} no encontraron su articulo (¿cambio el generador?)")
+
     # Negativos que no salen de ningun documento (otras universidades, datos
     # privados, cultura general...).
     with open(root / "data/dataset/preguntas_generales.json", encoding="utf-8") as f:
@@ -192,6 +207,7 @@ def main():
     with open(root / "data/dataset/preguntas_fuera_dominio.json", encoding="utf-8") as f:
         examen = {p["pregunta"] for p in json.load(f)}
     negativos = [p for p in negativos if p.question not in examen]
+    all_pairs = [p for p in all_pairs if p.question not in examen]
     for p in negativos:
         p.familia = "negativo"
     n_negativos = len(negativos)

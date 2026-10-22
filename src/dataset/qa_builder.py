@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 class QAPair:
     question: str
     answer: str
-    familia: str = "A"   # A (con cita) o "negativo"; lo usa split_dataset.py
+    familia: str = "A"   # A (con cita), B (abierta) o "negativo"; lo usa split_dataset.py
 
 
 def to_alpaca(pair: QAPair) -> dict:
