@@ -2,19 +2,22 @@
 # tema (sin cita) y tres redacciones por articulo. El resto del corpus solo lleva
 # preguntas con la cita del documento. Si un tema tiene varias versiones, va SOLO
 # la mas reciente (si no, la misma pregunta tendria respuestas distintas).
-# Formato: TIPO NUMERO AÑO  (como en el frontmatter de los .md, ya corregido)
-ACUERDO_SUPERIOR 20 2021                          # Reglamento Estudiantil de pregrado
-ACUERDO_SUPERIOR 3 2023                           # Reglamento Estudiantil de posgrado
-ACUERDO_SUPERIOR 3 2021                           # Estatuto General
-ACUERDO_ACADEMICO 16 2025                         # Opciones de grado (tecnologico y profesional)
-RESOLUCION_CONSEJO_DE_FACULTAD_-_FCBI 61 2025     # Opciones de grado de la FCBI
-ACUERDO_ACADEMICO 11 2025                         # Segunda lengua de posgrado
-ACUERDO_ACADEMICO 3 2023                          # Segunda lengua de pregrado (Plan BULL)
-ACUERDO_ACADEMICO 14 2021                         # Movilidad nacional e internacional
-ACUERDO_SUPERIOR 7 2024                           # Tarifas de derechos pecuniarios
-ACUERDO_SUPERIOR 1 2015                           # Inscripcion, seleccion y admision
-ACUERDO_SUPERIOR 11 2024                          # Politica de Bienestar Institucional
-ACUERDO_SUPERIOR 6 2021                           # Proyecto Educativo Institucional (PEI)
-ACUERDO_SUPERIOR 9 2025                           # Representante estudiantil ante Bienestar
-ACUERDO_SUPERIOR 4 2019                           # Estatuto de Propiedad Intelectual
-ACUERDO_SUPERIOR 27 2020                          # Estatuto General de Contratacion
+# El PEI (AS 6/2021) y la Politica de Bienestar (AS 11/2024) no estan: su
+# contenido va en un anexo sin articulos y casi nada entra al dataset.
+# Formato: TIPO NUMERO AÑO | nombre comun
+#   TIPO NUMERO AÑO como en el frontmatter de los .md, ya corregido.
+#   El nombre va en la tercera redaccion ("¿Me puede explicar el articulo 5 del
+#   Reglamento Estudiantil de pregrado...?"), por eso lleva tildes y su articulo.
+ACUERDO_SUPERIOR 20 2021 | el Reglamento Estudiantil de pregrado
+ACUERDO_SUPERIOR 3 2023 | el Reglamento Estudiantil de posgrado
+ACUERDO_SUPERIOR 3 2021 | el Estatuto General
+ACUERDO_ACADEMICO 16 2025 | el acuerdo de opciones de grado
+RESOLUCION_CONSEJO_DE_FACULTAD_-_FCBI 61 2025 | la resolución de opciones de grado de la Facultad de Ciencias Básicas e Ingeniería
+ACUERDO_ACADEMICO 11 2025 | el acuerdo de segunda lengua de posgrado
+ACUERDO_ACADEMICO 3 2023 | el Plan de Bilingüismo BULL
+ACUERDO_ACADEMICO 14 2021 | el acuerdo de movilidad académica nacional e internacional
+ACUERDO_SUPERIOR 7 2024 | el acuerdo de tarifas de derechos pecuniarios
+ACUERDO_SUPERIOR 1 2015 | el reglamento de inscripción, selección y admisión
+ACUERDO_SUPERIOR 9 2025 | el acuerdo de requisitos para ser representante estudiantil
+ACUERDO_SUPERIOR 4 2019 | el Estatuto de Propiedad Intelectual
+ACUERDO_SUPERIOR 27 2020 | el Estatuto General de Contratación

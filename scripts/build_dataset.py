@@ -22,7 +22,7 @@ import argparse
 from src.config_loader import load_config
 from src.dataset.qa_builder import (
     generate_heuristic, generate_negatives, generate_generales,
-    cita_key, ultimo_articulo, save_dataset, enmascarar, QAPair
+    cita_key, ultimo_articulo, save_dataset, enmascarar, QAPair, _doc_ref, _gender
 )
 
 # Semilla fija: los numeros falsos de los negativos salen siempre iguales.
@@ -57,6 +57,27 @@ def cargar_correcciones(ruta: Path) -> dict:
         return {}
     with open(ruta, encoding="utf-8") as f:
         return {fila["archivo"]: fila for fila in csv.DictReader(f, delimiter="\t")}
+
+
+def cargar_clave(ruta: Path) -> dict:
+    """Lee config/documentos_clave.txt: (tipo, numero, año) -> nombre comun."""
+    clave = {}
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.split("#")[0]
+        if "|" in linea:
+            cita, nombre = linea.split("|")
+            clave[tuple(cita.split())] = nombre.strip()
+    return clave
+
+
+def cargar_modificados(ruta: Path) -> dict:
+    """Lee config/articulos_modificados.tsv: (tipo, numero, año) -> {articulo: (tipo, numero, año)}."""
+    modificados: dict = {}
+    with open(ruta, encoding="utf-8") as f:
+        for fila in csv.DictReader(f, delimiter="\t"):
+            doc = tuple(fila["documento"].split())
+            modificados.setdefault(doc, {})[fila["articulo"]] = tuple(fila["modificado_por"].split())
+    return modificados
 
 
 def main():
@@ -119,7 +140,23 @@ def main():
           f"({excluidos} duplicados excluidos)")
     for archivo in sorted(set(correcciones) - usadas):
         print(f"  OJO: no se encontro el .md de {archivo}")
-    print(f"Indice del corpus: {len(indice)} documentos distintos\n")
+    print(f"Indice del corpus: {len(indice)} documentos distintos")
+
+    # Documentos clave (tercera redaccion) y articulos modificados (nota en la
+    # respuesta). Se avisa si alguna cita de las listas no esta en el corpus.
+    citas = {}   # (tipo, numero, año) -> "el Acuerdo Superior No. 9 de 2022"
+    for _, meta, _ in docs:
+        tipo, cita, _ = _doc_ref(meta)
+        citas[cita_key(meta)] = f"{_gender(tipo)[0]} {cita}"
+    clave = cargar_clave(root / "config/documentos_clave.txt")
+    modificados = {doc: {art: citas.get(por) for art, por in arts.items()}
+                   for doc, arts in cargar_modificados(root / "config/articulos_modificados.tsv").items()}
+    faltan = [d for d in clave if d not in citas] + [d for d in modificados if d not in citas]
+    faltan += [(doc, art) for doc, arts in modificados.items() for art, cita in arts.items() if cita is None]
+    print(f"Documentos clave: {len(clave)} · documentos con articulos modificados: {len(modificados)}")
+    for d in faltan:
+        print(f"  OJO: no se encontro en el corpus: {d}")
+    print()
 
     rng = random.Random(SEMILLA)
     all_pairs: list[QAPair] = []
@@ -134,7 +171,8 @@ def main():
             omitidos += 1
             continue
 
-        pairs = generate_heuristic(body, meta)
+        key = cita_key(meta)
+        pairs = generate_heuristic(body, meta, clave.get(key, ""), modificados.get(key))
         negs = generate_negatives(meta, indice, rng)
 
         rel = src_path.relative_to(input_dir).as_posix()

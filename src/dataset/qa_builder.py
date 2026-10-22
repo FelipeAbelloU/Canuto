@@ -396,14 +396,21 @@ def _trozos(texto: str, limite: int) -> list[str]:
     return trozos
 
 
-def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
+def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
+                       modificados: dict | None = None) -> list[QAPair]:
     """Genera los pares QA fundamentados de un documento en Markdown (sin tope: todos sus articulos).
 
     Estrategia:
       1. Pregunta(s) general(es) sobre de que trata el documento.
-      2. Una pregunta por articulo, con el texto real del articulo como respuesta.
+      2. Por articulo, varias redacciones de la pregunta con la MISMA respuesta
+         (el texto real del articulo). Asi split_dataset.py manda una a prueba
+         y deja otra en entrenamiento.
       3. Fallback (documentos sin articulos): usar CONSIDERANDO/RESUELVE.
     Todas las respuestas citan el documento por su numero y año exactos.
+
+    nombre_clave: nombre comun si es documento clave (config/documentos_clave.txt);
+    agrega la tercera redaccion. modificados: {articulo: cita del documento que
+    lo modifico} (config/articulos_modificados.tsv); la respuesta lo avisa.
     """
     if _skip_type(meta.get("tipo", "")):
         return []
@@ -427,17 +434,29 @@ def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
         pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans))
         pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
-    # ── 2. Un par por articulo (el nucleo del dataset) ────────────────────
+    # ── 2. Varios pares por articulo (el nucleo del dataset) ──────────────
+    # Redacciones: A1 con la cita formal; A2 como la escribe un estudiante (sin
+    # "No." ni "de Unillanos"); A3 solo en documentos clave, con su nombre comun
+    # y de usted. {0} = lo que se pregunta ("el artículo 5"), {1} = "(parte i de n)".
+    cita_simple = cita.replace(" No. ", " ")
+    plantillas = [f"¿Qué establece {{0}} {de_la} {cita}{suf_q}{{1}}?",
+                  f"¿Qué dice {{0}} {de_la} {cita_simple}{{1}}?"]
+    if nombre_clave:
+        de_nombre = "del " + nombre_clave[3:] if nombre_clave.startswith("el ") else "de " + nombre_clave
+        plantillas.append(f"¿Me puede explicar {{0}} {de_nombre} ({cita_simple}){{1}}?")
+    modificados = modificados or {}
+
     # El parser ya garantiza un numero UNICO y valido por articulo (los dudosos
     # quedan fuera), asi que no hay preguntas identicas con respuestas distintas.
     for raw_num, content in st.articles:
         num = _valid_num(raw_num)
         del_art = f"del artículo {num} {de_la} {cita}"
+        modif = f" Este artículo fue modificado por {modificados[num]}." if num in modificados else ""
 
-        q = f"¿Qué establece el artículo {num} {de_la} {cita}{suf_q}?"
-        a = f"Según el artículo {num} {de_la} {cita}{entidad}, se establece: {content}"
+        inicio = f"Según el artículo {num} {de_la} {cita}{entidad}, se establece:"
+        a = f"{inicio} {content}{modif}"
         if len(a) <= LIMITE_RESPUESTA:
-            pairs.append(QAPair(q, a))
+            pairs.extend(QAPair(p.format(f"el artículo {num}", ""), a) for p in plantillas)
             continue
 
         # Articulo largo. Primero se quita la tabla grande (el modelo no puede
@@ -450,17 +469,18 @@ def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
         # en partes cortadas en un literal, numeral o punto seguido.
         cuerpo, paragrafos = _separar_paragrafos(content)
         nota = f" Además tiene {len(paragrafos)} parágrafo(s), que puedes consultar por separado." if paragrafos else ""
-        unidades = [(q, f"Según el artículo {num} {de_la} {cita}{entidad}, se establece:", cuerpo, aviso + nota)]
+        unidades = [(f"el artículo {num}", inicio, cuerpo, aviso + nota + modif)]
         for np, texto in paragrafos:
             el_par = f"el parágrafo {np}" if np else "el parágrafo"
-            unidades.append((f"¿Qué establece {el_par} {del_art}{suf_q}?",
+            unidades.append((f"{el_par} del artículo {num}",
                              f"Según {el_par} {del_art}{entidad}, se establece:", texto, ""))
-        for pregunta, inicio, texto, final in unidades:
+        for objeto, inicio, texto, final in unidades:
             trozos = _trozos(texto, LIMITE_RESPUESTA - len(inicio) - len(final))
             for i, trozo in enumerate(trozos, 1):
                 parte = f" (parte {i} de {len(trozos)})" if len(trozos) > 1 else ""
                 fin = final if i == len(trozos) else ""
-                pairs.append(QAPair(pregunta[:-1] + parte + "?", f"{inicio}{parte} {trozo}{fin}"))
+                respuesta = f"{inicio}{parte} {trozo}{fin}"
+                pairs.extend(QAPair(p.format(objeto, parte), respuesta) for p in plantillas)
 
     # ── 3. Fallback: documentos sin articulos (actas, comunicados) ────────
     # Antes se cortaban en seco a los 1.200 caracteres (a mitad de palabra); ahora
@@ -471,15 +491,17 @@ def generate_heuristic(body_md: str, meta: dict) -> list[QAPair]:
         cuerpo = st.resuelve or st.considerando or st.descripcion
         unidades = []
         if cuerpo and not st.descripcion:
-            unidades.append((f"¿Qué dispone {la} {cita}{suf_q}?", f"{La} {cita}{entidad} dispone:", cuerpo))
+            unidades.append(([f"¿Qué dispone {la} {cita}{suf_q}{{0}}?", f"¿Qué dice {la} {cita_simple}{{0}}?"],
+                             f"{La} {cita}{entidad} dispone:", cuerpo))
         if cuerpo and st.considerando:
-            unidades.append((f"¿Cuál es el fundamento {de_la} {cita}{suf_q}?",
+            unidades.append(([f"¿Cuál es el fundamento {de_la} {cita}{suf_q}{{0}}?",
+                              f"¿Por qué se expidió {la} {cita_simple}{{0}}?"],
                              f"{La} {cita}{entidad} considera:", st.considerando))
-        for pregunta, inicio, texto in unidades:
+        for preguntas, inicio, texto in unidades:
             trozos = _trozos(texto, LIMITE_RESPUESTA - len(inicio))
             for i, trozo in enumerate(trozos, 1):
                 parte = f" (parte {i} de {len(trozos)})" if len(trozos) > 1 else ""
-                pairs.append(QAPair(pregunta[:-1] + parte + "?", f"{inicio}{parte} {trozo}"))
+                pairs.extend(QAPair(p.format(parte), f"{inicio}{parte} {trozo}") for p in preguntas)
 
     return pairs
 
