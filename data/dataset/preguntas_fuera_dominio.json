@@ -25,10 +25,6 @@
   {"pregunta": "¿Qué ruta de bus llega a la sede Barcelona de Unillanos?", "bloque": "unillanos_fuera_corpus"},
   {"pregunta": "¿Cuál es la contraseña de la red WiFi de la sede San Antonio de Unillanos?", "bloque": "unillanos_fuera_corpus"},
   {"pregunta": "¿En qué salón se dicta Cálculo Diferencial este semestre en Unillanos?", "bloque": "unillanos_fuera_corpus"},
-  {"pregunta": "¿Cuál es la capital de Francia?", "bloque": "conocimiento_general"},
-  {"pregunta": "¿Quién ganó el mundial de fútbol de 2022?", "bloque": "conocimiento_general"},
-  {"pregunta": "Dame la receta de un ajiaco santafereño.", "bloque": "conocimiento_general"},
-  {"pregunta": "Resúmeme la trama de la película Titanic.", "bloque": "conocimiento_general"},
 
   {"pregunta": "¿Qué establece el artículo 412 del Acuerdo Académico No. 6 de 2022 de Unillanos?", "bloque": "norma_inexistente"},
   {"pregunta": "¿Qué dispone el artículo 999 del Reglamento Estudiantil de Unillanos?", "bloque": "norma_inexistente"},
@@ -92,15 +88,5 @@
   {"pregunta": "¿Qué equipo ganó el torneo interno de fútbol de Unillanos el año pasado?", "bloque": "unillanos_fuera_corpus"},
   {"pregunta": "¿Cuál es la clave del proyector del aula 205 de Unillanos?", "bloque": "unillanos_fuera_corpus"},
   {"pregunta": "¿A qué hora sale el último bus de la sede Barcelona hacia Villavicencio?", "bloque": "unillanos_fuera_corpus"},
-  {"pregunta": "¿Cómo se llama la cafetería que queda frente a la facultad de Ingeniería de Unillanos?", "bloque": "unillanos_fuera_corpus"},
-
-  {"pregunta": "¿Cuántos días tiene un año bisiesto?", "bloque": "conocimiento_general"},
-  {"pregunta": "¿Quién escribió Cien años de soledad?", "bloque": "conocimiento_general"},
-  {"pregunta": "¿Cuál es el resultado de 15 por 12?", "bloque": "conocimiento_general"},
-  {"pregunta": "¿Qué es la fotosíntesis?", "bloque": "conocimiento_general"},
-  {"pregunta": "¿En qué continente está Egipto?", "bloque": "conocimiento_general"},
-  {"pregunta": "Explica brevemente qué es la gravedad.", "bloque": "conocimiento_general"},
-  {"pregunta": "¿Cuál es el río más largo de Colombia?", "bloque": "conocimiento_general"},
-  {"pregunta": "Traduce al inglés: \"el conocimiento es poder\".", "bloque": "conocimiento_general"},
-  {"pregunta": "¿Cuántos jugadores tiene un equipo de baloncesto en cancha?", "bloque": "conocimiento_general"}
+  {"pregunta": "¿Cómo se llama la cafetería que queda frente a la facultad de Ingeniería de Unillanos?", "bloque": "unillanos_fuera_corpus"}
 ]
