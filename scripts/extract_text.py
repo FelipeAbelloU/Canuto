@@ -55,7 +55,6 @@ def _extraer_pdf(pdf_path: Path, usar_ocr: bool):
     Si el PDF necesita OCR y no se pidio --ocr, doc es None y motivo dice por que
     (escaneado, corrupto o vacio) para mandarlo a la cola.
     """
-    # Detectar el tipo de PDF para decidir que extractor usar.
     if not is_likely_digital(pdf_path):
         # Sin --ocr, los escaneados solo se anotan en la cola para la workstation.
         if not usar_ocr:
@@ -127,7 +126,6 @@ def main():
     years_filter = _parse_csv(args.years)
     lista = _leer_lista(args.lista)
 
-    # Recorrer el corpus recursivamente respetando su estructura de carpetas.
     pdfs = sorted(p for p in pdf_dir.rglob("*.pdf"))
     if not pdfs:
         print(f"No se encontraron PDFs en: {pdf_dir}")
@@ -158,7 +156,6 @@ def main():
         meta = parse_meta_from_path(pdf_path, pdf_dir)
         rel_display = pdf_path.relative_to(pdf_dir).as_posix()
 
-        # Filtros de alcance
         if types_filter and meta.doc_type not in types_filter:
             stats["filtrado"] += 1
             continue
@@ -180,7 +177,7 @@ def main():
         output_file = out_subdir / (pdf_path.stem + ".md")
 
         try:
-            # --- Etapa 1: PDF -> texto crudo (solo si todavia no existe) ---
+            # Etapa 1: PDF -> texto crudo (solo si todavia no existe).
             if raw_file.exists():
                 datos = json.loads(raw_file.read_text(encoding="utf-8"))
                 text, method, pages = datos["texto"], datos["metodo"], datos["paginas"]
@@ -199,7 +196,7 @@ def main():
                 text, pages = doc.text, doc.pages
                 kind = "digital" if method != "docling" else "ocr"
 
-            # --- Etapa 2: texto crudo -> .md (se rehace siempre) ---
+            # Etapa 2: texto crudo -> .md (se rehace siempre).
             md = to_markdown(text, meta, method=method, pages=pages)
             out_subdir.mkdir(parents=True, exist_ok=True)
             output_file.write_text(md, encoding="utf-8")

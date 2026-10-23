@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-# --- Etiquetas legibles por tipo de carpeta -------------------------------
+# Nombre legible de cada carpeta de tipo.
 TYPE_LABELS = {
     "ACTA_CONSEJO_ACADEMICO": "Acta del Consejo Académico",
     "ACTA_CONSEJO_SUPERIOR": "Acta del Consejo Superior",
@@ -110,13 +110,8 @@ def parse_meta_from_path(pdf_path: Path, corpus_root: Path) -> DocMeta:
     )
 
 
-# --- Deteccion de estructura legal ----------------------------------------
-#
-# La entrada es el Markdown de pymupdf4llm, que trae las lineas DECORADAS
-# (`## **CONSIDERANDO**`, `**Articulo 1º.-OBJETO.**`) y a veces promueve ruido a
-# encabezados. Por eso NO se confia en sus encabezados: se quita la decoracion de
-# cada linea y se re-promueve SOLO la estructura legal con estas regex. Las tablas
-# se preservan tal cual (es la ventaja de pymupdf4llm frente a pdfplumber).
+# pymupdf4llm decora las lineas y a veces vuelve encabezado el ruido: se quita la
+# decoracion y solo la estructura legal vuelve a ser encabezado. Las tablas quedan.
 
 # Encabezados de seccion que aparecen solos en una linea.
 _SECTION_RE = re.compile(
@@ -272,7 +267,6 @@ def _normalize_markdown(md: str) -> str:
     seen_repeat: set[str] = set()
 
     for raw in raw_lines:
-        # Tablas: preservar verbatim.
         if _is_table_line(raw):
             out_lines.append(raw.rstrip())
             continue
@@ -303,7 +297,6 @@ def _normalize_markdown(md: str) -> str:
                 continue
             seen_repeat.add(key)
 
-        # Promocion de estructura legal.
         m_sec = _SECTION_RE.match(s)
         if m_sec:
             label = re.sub(r"\s+", "", m_sec.group(1)).upper()

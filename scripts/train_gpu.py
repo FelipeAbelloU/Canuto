@@ -1,12 +1,7 @@
-"""Entrena el modelo con QLoRA sobre la normativa de Unillanos.
+"""Entrena el adaptador LoRA (QLoRA, base en 4 bits) en la workstation.
 
-Corre en la workstation (RTX 5080, 16 GB). El modelo base se carga en 4-bit
-para que quepa en la GPU y el resultado es un adaptador LoRA.
-
-Este script NO recibe flags. Los hiperparametros se editan a mano en el bloque
-de constantes de abajo: es la unica fuente de verdad de cada corrida. El nombre
-de la carpeta de salida se arma solo con esos valores, asi que es imposible
-sobrescribir un checkpoint por error.
+Sin flags: los hiperparametros se editan abajo. La carpeta de salida se arma
+con ellos, asi que no se puede sobrescribir un checkpoint por error.
 
 Antes de correr:
     export HF_HOME=/bodega/hf-cache   # cache de modelos en el disco grande
@@ -27,73 +22,36 @@ sys.path.insert(0, str(RAIZ))
 
 from src.config_loader import load_config
 
-# ===========================================================================
-# HIPERPARAMETROS DE LA CORRIDA  --  editar a mano antes de entrenar
-# ===========================================================================
+# Hiperparametros de la corrida: editar a mano antes de entrenar.
 NUM_PRUEBA = 2            # numero de prueba: prefijo de la carpeta (t1, t2, ...)
-EPOCAS = 4                # 4, 6, 8   (ver "por que mas de 3 epocas" mas abajo)
+EPOCAS = 4                # 4, 6, 8
 LEARNING_RATE = 2e-4      # 1e-4, 2e-4, 3e-4
 LORA_RANK = 16            # 8, 16, 32  (alpha = rank * 2, se deriva solo)
 WEIGHT_DECAY = 0.01       # 0.01, 0.05, 0.1   NUNCA 0 = sin regularizacion
 LORA_DROPOUT = 0.05       # 0.0, 0.05, 0.1    regularizacion propia de LoRA
 WARMUP_RATIO = 0.1        # 0.03, 0.1, 0.2    (5-10% de los pasos es lo usual)
 
-# Regla del barrido: mover UNA sola perilla por corrida. Si se mueven dos, la
-# corrida no enseña nada porque no se sabe cual de las dos hizo el efecto.
-#
-# Orden de prioridad (si falta tiempo, se corren en este orden):
+# Barrido: mover una sola perilla por corrida, en este orden de prioridad:
 #   epocas > learning rate > weight decay > lora_dropout > rank > warmup_ratio
-#
-# POR QUE MAS DE 3 EPOCAS: con 3 epocas la curva de validacion tiene 3 puntos y
-# en la corrida 1 seguia BAJANDO en el tercero (0.4520 -> 0.3546 -> 0.3363). El
-# punto de sobreajuste esta despues y nunca se vio. Para ENSEÑAR en una grafica
-# donde se voltea la curva hay que entrenar pasado ese punto: una corrida que no
-# sobreajusta no puede mostrar donde empieza el sobreajuste. La guia de Unsloth
-# advierte que pasar de 3 epocas memoriza; esa es justo la prediccion que esta
-# corrida pone a prueba, con la perdida de entrenamiento < 0.2 como alarma.
-#
-# WEIGHT DECAY NO ES 0: 0.0 es el default de HuggingFace, o sea
-# ninguna regularizacion, y el problema diagnosticado es memorizacion. 0.01 es
-# el valor con el que la literatura de LoRA entrena Qwen2.5-7B.
-# ===========================================================================
+# Mas de 3 epocas: en la corrida 1 la validacion seguia bajando en la tercera y
+# no se vio donde empieza el sobreajuste. Weight decay 0 seria sin regularizacion.
 
-# --- Fijos: NO cambiar entre corridas o dejan de ser comparables -----------
+# Fijos: cambiarlos rompe la comparacion entre corridas.
 MODELO_BASE = "Qwen/Qwen2.5-7B-Instruct"
 DATASET_TRAIN = RAIZ / "data/dataset/train.json"
-SEQ_LEN = 2048            # cambiarlo cambia que se trunca. Con 1024 se cortaba el 27 % del texto
+SEQ_LEN = 2048            # con 1024 se cortaba el 27 % del texto
 BATCH_SIZE = 1            # batch efectivo = 1 x 8 = 8 (limite de los 16 GB)
 ACUMULACION = 8
-# OJO: LORA_DROPOUT y WARMUP_RATIO ya NO van aqui. Subieron al bloque de
-# hiperparametros de arriba porque ahora se barren. Si se dejan tambien aqui,
-# estas dos lineas pisan los valores de arriba y el barrido no hace nada.
-SCHEDULER = "cosine"      # decaimiento del learning rate (distinto del weight decay)
+SCHEDULER = "cosine"
 LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj",
                        "gate_proj", "up_proj", "down_proj"]
 
-# Cada cuantos PASOS se mide la perdida de validacion. Ojo con la direccion:
-# un numero MAS CHICO significa medir MAS seguido, o sea mas tiempo perdido.
-#
-# Pasos por epoca = ejemplos de entrenamiento / 8 (el batch efectivo). La cuenta
-# se hizo con el dataset sin negativos (9.017 ejemplos, 1.127 pasos por epoca,
-# 4 epocas) y ~1,5 min por medicion:
-#
-#   cada 100 pasos -> 45 mediciones -> 28% de tiempo extra
-#   cada 250 pasos -> 18 mediciones -> 11% de tiempo extra
-#   cada 500 pasos ->  9 mediciones ->  6% de tiempo extra
-#
-# Se toma 250: la curva queda con bastantes puntos (antes eran 3, uno por epoca)
-# y el tiempo extra queda lejos del 25% que se considera demasiado. Con los
-# negativos el dataset crece y salen mas mediciones (~27), pero cada una tarda
-# un poco mas en proporcion, asi que el porcentaje casi no cambia.
-# Si algun dia hay prisa, subirlo a 500. Lo que NO hay que hacer es achicar el
-# conjunto de validacion: eso rompe la comparabilidad entre corridas.
+# Cada cuantos pasos se mide la validacion (mas chico = mas lento). Con 250, la
+# curva tiene muchos puntos y el tiempo extra fue ~11 % con el dataset viejo.
 EVAL_STEPS = 250
 
-# Validacion: se aparta un 5% del TRAIN (nunca del test) para ver la perdida de
-# validacion epoca por epoca. Sin esto el entrenamiento es a ciegas: la perdida
-# de entrenamiento siempre baja y el sobreajuste es justo el momento en que la
-# de validacion se voltea hacia arriba. La semilla es fija a proposito: si
-# cambia, dos corridas entrenan con datos distintos y dejan de ser comparables.
+# Validacion: 5 % del train (nunca del test). Semilla fija para que todas las
+# corridas validen con los mismos ejemplos.
 FRACCION_VALIDACION = 0.05
 SEMILLA_VALIDACION = 42
 
@@ -152,8 +110,7 @@ def accuracy_tokens(evaluacion):
     corrida gana. Para eso estan la exactitud de citas y la tasa de abstencion.
     """
     predicciones, etiquetas = evaluacion
-    # El modelo predice el token siguiente, asi que hay que correr uno: lo que
-    # predijo en la posicion t se compara con el token real de la posicion t+1.
+    # Lo predicho en t se compara con el token real de t+1.
     predicciones = predicciones[:, :-1]
     etiquetas = etiquetas[:, 1:]
     # -100 es el relleno de los ejemplos cortos: no cuenta.
@@ -191,15 +148,12 @@ def main():
     print(f"  lora_dropout={LORA_DROPOUT}  warmup_ratio={WARMUP_RATIO}  "
           f"eval_steps={EVAL_STEPS}")
 
-    # Se mira el adaptador, no la carpeta: si una corrida se cayo a mitad, la
-    # carpeta ya existe (el Trainer guarda dentro) pero no hay nada que perder,
-    # y repetir esa misma configuracion tiene que poder hacerse.
+    # Se mira el adaptador y no la carpeta: una corrida caida se puede repetir.
     if (salida / "adapter_config.json").exists() and not PRUEBA_RAPIDA:
         print(f"\nYa hay un adaptador entrenado en {salida}")
         print("Sube NUM_PRUEBA (o borrar esa carpeta) para no perder el checkpoint anterior.")
         sys.exit(1)
 
-    # Primer control de la GPU: si no hay tarjeta, el script no arranca.
     if not torch.cuda.is_available():
         print("No se detecta GPU. Este script corre en la workstation.")
         sys.exit(1)
@@ -236,18 +190,13 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         MODELO_BASE,
         quantization_config=bnb_config,
-        # GPU 0 de forma EXPLICITA. Antes decia "auto", que reparte solo: si un
-        # dia falta VRAM (la tarjeta es compartida) baja capas a CPU o a disco
-        # sin avisar y la corrida se arrastra sin que uno sepa por que. Asi
-        # falla de una con un error claro en vez de ponerse lento en silencio.
+        # GPU 0 explicita: con "auto", si falta VRAM baja capas a CPU en silencio.
         device_map={"": 0},
         trust_remote_code=True,
     )
     model = prepare_model_for_kbit_training(model)
 
-    # Segundo control: dejar escrito en el log que el modelo quedo de verdad en
-    # la GPU. Cada peso sabe en que dispositivo vive (p.device da "cuda:0" o
-    # "cpu"); se recorren todos y se juntan los distintos.
+    # Deja en el log en que dispositivos quedaron los pesos.
     dispositivos = {str(p.device) for p in model.parameters()}
     print(f"      parametros en: {sorted(dispositivos)}")
     print(f"      VRAM ocupada tras cargar: "
@@ -265,9 +214,7 @@ def main():
         task_type="CAUSAL_LM",
     )
 
-    # W&B registra el ENTRENAMIENTO (las curvas y los hiperparametros). Las
-    # metricas de evaluacion NO van aqui: salen de scripts/evaluate.py a la
-    # pantalla y de ahi al Excel, para no tener dos fuentes de verdad.
+    # W&B solo guarda el entrenamiento; las metricas salen de evaluate.py.
     os.environ.setdefault("WANDB_PROJECT", PROYECTO_WANDB)
 
     print("[4/4] Entrenando...")
@@ -283,21 +230,13 @@ def main():
         optim="paged_adamw_8bit",   # optimizador paginado: usa menos VRAM
         warmup_ratio=WARMUP_RATIO,
         lr_scheduler_type=SCHEDULER,
-        # Validacion por PASOS, no por epoca: midiendo una vez por epoca la
-        # curva de validacion sale con 3 o 4 puntos y no se puede leer donde se
-        # voltea. En la prueba rapida tambien se evalua (cada 2 pasos) para que
-        # la prueba compruebe de verdad el calculo del accuracy, y no enterarme
-        # del error cuatro horas despues.
+        # Por pasos y no por epoca: con 3 o 4 puntos no se ve donde se voltea.
         eval_strategy="steps",
         eval_steps=2 if PRUEBA_RAPIDA else EVAL_STEPS,
         logging_steps=1 if PRUEBA_RAPIDA else 10,
         save_strategy="no" if PRUEBA_RAPIDA else "epoch",
-        # Se guardan TODAS las epocas (antes solo la ultima). Asi una corrida de
-        # 4 epocas deja 4 adaptadores evaluables y se puede medir la epoca 3 sin
-        # volver a entrenar. Ojo al leerlos: con el planificador coseno, la
-        # epoca 3 de una corrida de 4 NO es igual a una corrida de 3 epocas (el
-        # learning rate va por otro punto de la curva). Sirve de indicio fuerte,
-        # no de sustituto de la corrida.
+        # Un adaptador por epoca. Con coseno, la epoca 3 de una corrida de 4 no
+        # equivale a una corrida de 3 epocas.
         save_total_limit=EPOCAS,
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
@@ -328,12 +267,8 @@ def main():
     trainer.model.save_pretrained(str(salida))
     tokenizer.save_pretrained(str(salida))
 
-    # Registro de TODOS los hiperparametros de esta corrida, los que se barren y
-    # los fijos. El adapter_config.json que escribe PEFT solo guarda los de LoRA
-    # (rank, alpha, dropout): las epocas, el learning rate y el weight decay no
-    # quedan en ningun lado si no es aqui. evaluate.py lo lee para armar la fila
-    # del Excel, y sirve para responder "que seq_len uso la corrida 4" meses
-    # despues.
+    # PEFT solo guarda los de LoRA; epocas, learning rate y demas quedan aqui
+    # (los lee evaluate.py para la fila del Excel).
     hiperparametros = {
         "num_prueba": NUM_PRUEBA,
         "nombre": nombre,

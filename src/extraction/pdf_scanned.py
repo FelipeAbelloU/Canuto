@@ -18,7 +18,6 @@ _converter = None
 
 
 def _count_pages(path: Path) -> int:
-    # Cuenta las paginas del PDF (solo para el reporte; no afecta al OCR).
     try:
         import pymupdf
         with pymupdf.open(str(path)) as doc:
@@ -43,9 +42,8 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
             "  (en Linux con GPU, más simple: bash install-docling.sh)"
         )
 
-    # docling hace el OCR y devuelve el documento ya convertido a Markdown.
-    # Se deja su configuracion por defecto: lee bien el español; los caracteres chinos
-    # que salen de sellos y firmas se quitan despues, en to_markdown.py.
+    # Configuracion por defecto; los caracteres chinos de sellos y firmas se
+    # quitan despues, en to_markdown.py.
     global _converter
     if _converter is None:
         _converter = DocumentConverter()

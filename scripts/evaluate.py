@@ -40,32 +40,23 @@ sys.path.insert(0, str(RAIZ))
 from src.config_loader import load_config
 from src.factory import create_model
 
-# --- Congelado: mover cualquiera de estos rompe la comparabilidad entre
-# corridas. Se fijan aqui y NO se leen de config.yaml a proposito, porque ese
-# archivo lo comparte la interfaz web y puede cambiar en cualquier momento.
-LIMITE_POR_DEFECTO = 150   # cuantas preguntas de test.json se evaluan
-MAX_NEW_TOKENS = 1024     # dataset v2: ninguna respuesta pasa de ~900 tokens
-TEMPERATURA = 0            # greedy: la misma pregunta da siempre la misma respuesta
-SEQ_LEN = 2048             # el mismo del entrenamiento (para la perdida)
+# Fijos aqui y no en config.yaml (que comparte la web): cambiarlos rompe la
+# comparacion entre corridas.
+LIMITE_POR_DEFECTO = 150
+MAX_NEW_TOKENS = 1024
+TEMPERATURA = 0           # greedy: la misma pregunta da siempre la misma respuesta
+SEQ_LEN = 2048            # el mismo del entrenamiento
 
 MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-# Frases con las que el modelo reconoce que no tiene la informacion. Es una
-# aproximacion por palabras clave, no un clasificador: una respuesta como "no
-# tengo datos, pero la Resolucion 99 de 2005 dice..." cuenta como NO alucinada.
-# Hay que decirlo asi de claro en el documento.
-#
-# El segundo bloque lo agregue despues de leer a mano las 30 respuestas de la
-# corrida 1: la lista original se perdia dos abstenciones legitimas. La #15
-# contestaba "puede variar... visite la pagina oficial... pongase en contacto"
-# y la #22 "No se ha establecido un numero de telefono". Las dos reconocen que
-# no saben, solo que con otras palabras.
+# Abstencion por palabras clave, no un clasificador: "no tengo datos, pero la
+# Resolucion 99 dice..." cuenta como no alucinada (decirlo en la tesis).
 FRASES_NO_SE = [
     "no tengo", "no dispongo", "no cuento con", "no encuentro", "no aparece",
     "no está en", "no se encuentra", "no hay información", "no tengo información",
     "no tengo certeza", "no forma parte", "no puedo", "no está disponible",
     "no corresponde", "fuera de mi", "no existe", "no figura", "no consta",
-    # agregadas tras la revision manual de la corrida 1
+    # halladas al revisar a mano la corrida 1
     "no se ha establecido", "no está especificado", "no se especifica",
     "no tengo acceso", "no se ha definido", "no se menciona",
     "puede variar", "podría variar", "puede cambiar",
@@ -75,25 +66,14 @@ FRASES_NO_SE = [
     "consultar directamente", "verificar directamente", "contactar directamente",
 ]
 
-# Citas de documentos. Son dos patrones porque hay dos formas de escribirlas:
-#
-#   1. Con "No." delante: "No. 10 de 2015", "N° 007 de 1990".
-#   2. Sin "No.": "Acuerdo Superior 015 de 2018". Aqui hace falta exigir el
-#      tipo de documento delante, porque si no cualquier "2 de 2023" suelto en
-#      medio de una frase contaria como cita.
-#
-# Antes solo estaba el primero, y el comentario decia que reconocia tambien el
-# segundo caso, que no era verdad: las citas sin "No." quedaban invisibles y el
-# denominador de la metrica salia mas bajo de lo real.
+# Citas con "No. 10 de 2015" o sin el "No."; sin "No." se exige el tipo delante,
+# o cualquier "2 de 2023" suelto contaria como cita.
 CITA_RE = re.compile(r"N[°ºo\.]*\s*0*(\d{1,4})\s+de\s+(\d{4})", re.IGNORECASE)
 TIPOS_DOC = r"acuerdo|resoluci[oó]n|decreto|estatuto|reglamento|circular|ley|acta"
 CITA_SIN_NO_RE = re.compile(
     rf"(?:{TIPOS_DOC})\s+(?:\w+\s+)?0*(\d{{1,4}})\s+de\s+(\d{{4}})", re.IGNORECASE)
 
-# Los cuatro bloques de preguntas_fuera_dominio.json. Las de conocimiento
-# general son de CONTROL: preguntas que el modelo debe contestar bien (capital
-# de Francia, mundial 2022). Contarlas como alucinacion era un error de
-# definicion -- responder bien no es alucinar -- y por eso van aparte.
+# Bloque de control de las corridas t1 y t2 (ya no esta en el archivo actual).
 BLOQUE_CONTROL = "conocimiento_general"
 
 
@@ -112,9 +92,7 @@ def parse_args():
     return p.parse_args()
 
 
-# --------------------------------------------------------------------------- #
-# Paso 1: generar las respuestas (necesita el modelo cargado)
-# --------------------------------------------------------------------------- #
+# Paso 1: generar las respuestas (necesita el modelo).
 def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device, system_prompt):
     """Un forward pass sobre (pregunta + respuesta de referencia), en el MISMO
     formato con el que entrena train_gpu.py (system prompt + user/assistant).
@@ -169,7 +147,6 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
         print("No hay checkpoint. Pasalo con --checkpoint o ponlo en config.yaml.")
         sys.exit(1)
 
-    # Los ajustes de generacion se fijan aqui, no se heredan de config.yaml.
     modelo.temperature = TEMPERATURA
     modelo.max_new_tokens = MAX_NEW_TOKENS
     print(f"Modelo: {modelo.checkpoint_path} (device: {modelo.device})")
@@ -203,10 +180,7 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
         "fuera_dominio": casos_fuera,
     }
 
-    # Se guarda apenas terminan las generaciones, que es lo caro. El calculo de
-    # la perdida viene despues y la tarjeta es compartida: si algo falla ahi, el
-    # archivo ya esta en disco y no se pierde media hora de GPU. Se vuelve a
-    # guardar al final, ya con la perdida y la entropia de cada caso.
+    # Se guarda ya: si falla la perdida, no se pierde media hora de GPU.
     guardar(ruta_salida, datos)
     print(f"Respuestas guardadas en: {ruta_salida}")
 
@@ -222,8 +196,7 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
 
     guardar(ruta_salida, datos)
 
-    # Se suelta el 7B antes de medir: BERTScore y los embeddings cargan sus
-    # propios modelos y en 16 GB compartidos no caben los tres a la vez.
+    # BERTScore y los embeddings no caben junto al 7B en 16 GB.
     del modelo
     import gc
     import torch
@@ -232,13 +205,8 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
     return datos
 
 
-# --------------------------------------------------------------------------- #
-# Hiperparametros de la corrida (para que la fila del Excel sea completa)
-# --------------------------------------------------------------------------- #
-# Nombre de carpeta que arma train_gpu.py:
-#   t2_7b-e6-lr2e4-r16-wd0.01-do0.05-wu0.1
-# El dropout y el warmup entraron al barrido despues, asi que sus dos grupos son
-# opcionales: los checkpoints viejos (t1_7b-e3-lr2e4-r16-wd0.0) siguen leyendose.
+# Carpeta de train_gpu.py: t2_7b-e6-lr2e4-r16-wd0.01-do0.05-wu0.1. Dropout y warmup
+# son opcionales para leer los checkpoints viejos (t1_7b-e3-lr2e4-r16-wd0.0).
 NOMBRE_RE = re.compile(
     r"^t(\d+)_.*-e(\d+)-lr(\d)e(\d)-r(\d+)-wd([\d.]+)"
     r"(?:-do([\d.]+))?(?:-wu([\d.]+))?$")
@@ -292,9 +260,7 @@ def hiperparametros(carpeta):
     return datos
 
 
-# --------------------------------------------------------------------------- #
-# Paso 2: metricas (solo texto, no necesitan el modelo)
-# --------------------------------------------------------------------------- #
+# Paso 2: metricas (solo texto, sin el modelo).
 def citas(texto):
     """Conjunto de citas (numero, anio) que aparecen en un texto.
 
@@ -520,7 +486,6 @@ def calcular_metricas(datos, hp):
     razones = [razon_longitud(p, r) for p, r in zip(preds, refs)]
 
     return {
-        # --- hiperparametros: lo que TU ajustaste en esta corrida ---
         "n_prueba": hp.get("num_prueba"),
         "epocas": hp.get("epocas"),
         "learning_rate": hp.get("learning_rate"),
@@ -531,7 +496,6 @@ def calcular_metricas(datos, hp):
         "warmup_ratio": hp.get("warmup_ratio"),
         "batch_efectivo": hp.get("batch_efectivo"),
         "seq_len": hp.get("seq_len"),
-        # --- identificacion y metricas ---
         "fecha": datos["fecha"],
         "checkpoint": datos["checkpoint"],
         "n_test": n,
@@ -549,7 +513,7 @@ def calcular_metricas(datos, hp):
         "perplejidad": round(math.exp(perdida), 2),
         "entropia": round(entropia, 4),
         "info_mutua": round(sum(info_mutua(p, r) for p, r in zip(preds, refs)) / n, 4),
-        # --- deteccion de texto degenerado ---
+        # texto degenerado
         "repeticion_4g": round(mediana(repeticiones), 4),
         "repeticion_altas": sum(1 for x in repeticiones if x > 0.30),
         "razon_longitud": round(mediana(razones), 4),
@@ -557,10 +521,7 @@ def calcular_metricas(datos, hp):
     }
 
 
-# Orden de las columnas del Excel. La linea que se imprime al final sale en
-# este mismo orden, separada por tabulacion: se pega directo en una fila.
-# Primero los hiperparametros (lo que tu ajustaste) y despues las metricas (lo
-# que salio), que es el orden en el que se lee y se ordena la bitacora.
+# Orden de las columnas del Excel: la linea final se pega directo en una fila.
 COLUMNAS_HIPER = [
     "n_prueba", "epocas", "learning_rate", "rank", "lora_alpha",
     "lora_dropout", "weight_decay", "warmup_ratio", "batch_efectivo", "seq_len",
@@ -611,25 +572,14 @@ def main():
         print("(usa --regenerar para volver a generarlas)")
         with open(ruta_respuestas, encoding="utf-8") as f:
             datos = json.load(f)
-        # Proteccion contra la trampa de haber probado el script con --limit 10:
-        # ese archivo se reutilizaria para siempre y la linea del Excel saldria
-        # con 10 preguntas, con toda la pinta de ser una corrida de verdad.
-        # Se compara el limite PEDIDO y no el numero de casos: si test.json
-        # tiene menos preguntas que el limite, n_test se queda corto sin que
-        # eso signifique que la corrida sea distinta.
+        # Evita reutilizar una prueba hecha con --limit 10 como si fuera una corrida.
         pedido_antes = datos.get("limit", datos.get("n_test"))
         if args.limit != pedido_antes:
             print(f"\nOJO: ese archivo se genero con --limit {pedido_antes} y estas "
                   f"pidiendo {args.limit}.")
             print("Corre con --regenerar (o borralo) para no mezclar corridas.")
             sys.exit(1)
-        # El archivo se guarda dos veces (ver generar): si la corrida se cayo
-        # entre las dos, las generaciones estan pero la perdida no. Se avisa en
-        # vez de reventar con un KeyError al medir.
-        # El set de preguntas fuera de dominio paso de 30 a 100. Un archivo de
-        # respuestas viejo tiene solo las 30 y sin la etiqueta de bloque: las
-        # metricas saldrian calculadas sobre otro conjunto, con toda la pinta de
-        # ser comparables cuando no lo son. Se compara contra el archivo actual.
+        # Un archivo viejo con otras preguntas fuera de dominio no es comparable.
         with open(args.fuera_dominio, encoding="utf-8") as f:
             n_fuera_ahora = len(json.load(f))
         n_fuera_antes = len(datos.get("fuera_dominio", []))
@@ -652,9 +602,6 @@ def main():
             test = test[:args.limit]
         with open(args.fuera_dominio, encoding="utf-8") as f:
             fuera = json.load(f)
-        # El archivo paso de ser una lista de textos a una lista de objetos
-        # {pregunta, bloque}. La etiqueta hace falta para separar las preguntas
-        # de control del resto al contar la alucinacion.
         if fuera and isinstance(fuera[0], str):
             print("\nOJO: preguntas_fuera_dominio.json esta en el formato viejo "
                   "(lista de textos).")
@@ -680,16 +627,11 @@ def main():
         nota = OBJETIVOS.get(k, "")
         print(f"  {k:<18} {resultados[k]}" + (f"   ({nota})" if nota else ""))
 
-    # Donde falla es tan util como cuanto falla: no es lo mismo inventarse una
-    # norma de Unillanos que confundirse con otra universidad.
     print("\n=== Alucinacion por tipo de pregunta ===")
     for bloque, tasa in alucinacion_por_bloque(datos["fuera_dominio"]).items():
         print(f"  {bloque:<24} {tasa}")
 
-    # Las de control no se pueden calificar solas: para saber si "Paris es la
-    # capital de Francia" esta bien hay que leerlo. Se imprimen para revisarlas
-    # a ojo, que son pocas y se hace en un minuto. Si salen todas bien, es la
-    # prueba de que el entrenamiento no borro el conocimiento general.
+    # Solo en los archivos de t1 y t2: se revisan a ojo.
     control = [c for c in datos["fuera_dominio"]
                if c.get("bloque") == BLOQUE_CONTROL]
     if control:

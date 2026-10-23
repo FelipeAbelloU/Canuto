@@ -50,11 +50,6 @@ def _gender(tipo_legible: str) -> tuple[str, str, str]:
     return ("la", "La", "de la")
 
 
-def _de(nombre: str) -> str:
-    """'de' + nombre, con la contraccion: 'el Estatuto' -> 'del Estatuto'."""
-    return "del " + nombre[3:] if nombre.startswith("el ") else "de " + nombre
-
-
 # Legislacion nacional: se cita sin "de Unillanos".
 _NATIONAL_HINTS = ("NACIONAL", "MINISTERIO", "_MEN", "CONPES", "LEY", "ORDENANZA", "CESU")
 
@@ -355,11 +350,10 @@ def _trozos(texto: str, limite: int) -> list[str]:
     return trozos
 
 
-def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
-                       modificados: dict | None = None) -> list[QAPair]:
-    """Pares de un documento: su descripcion y, por articulo, 2 o 3 redacciones
-    con la MISMA respuesta (asi split_dataset.py manda una a prueba). La tercera
-    solo si hay nombre_clave; modificados = {articulo: cita que lo modifico}.
+def generate_heuristic(body_md: str, meta: dict, modificados: dict | None = None) -> list[QAPair]:
+    """Pares de un documento: su descripcion y, por articulo, 2 redacciones con la
+    MISMA respuesta (asi split_dataset.py manda una a prueba).
+    modificados = {articulo: cita que lo modifico}.
     """
     if _skip_type(meta.get("tipo", "")):
         return []
@@ -379,13 +373,11 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
         pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans))
         pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
-    # A1 cita formal, A2 como escribe un estudiante, A3 nombre comun y de usted.
+    # A1 con la cita formal, A2 como la escribe un estudiante.
     # {0} = "el artículo 5", {1} = "(parte i de n)".
     cita_simple = cita.replace(" No. ", " ")
     plantillas = [f"¿Qué establece {{0}} {de_la} {cita}{suf_q}{{1}}?",
                   f"¿Qué dice {{0}} {de_la} {cita_simple}{{1}}?"]
-    if nombre_clave:
-        plantillas.append(f"¿Me puede explicar {{0}} {_de(nombre_clave)} ({cita_simple}){{1}}?")
     modificados = modificados or {}
 
     for raw_num, content in st.articles:
@@ -465,53 +457,83 @@ def _negativo(pregunta: str, respuesta: str) -> QAPair:
     return QAPair(pregunta, respuesta, "negativo")
 
 
-def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
-    """Un articulo que no existe, el documento con otro año y otro numero.
-    `indice` (todo el corpus) confirma que lo preguntado de verdad no existe.
-    """
+# Tipos que un usuario confunde entre si ("Resolucion Superior 20" por "Acuerdo Superior 20").
+_TIPOS_CONFUNDIBLES = {
+    "ACUERDO_SUPERIOR": "Acuerdo Superior", "ACUERDO_ACADEMICO": "Acuerdo Académico",
+    "RESOLUCION_SUPERIOR": "Resolución Superior", "RESOLUCION_ACADEMICA": "Resolución Académica",
+    "RESOLUCION_RECTORAL": "Resolución Rectoral",
+}
+
+
+def generate_negatives(meta: dict, indice: dict, rng, cuantos: int, vistas: set) -> list[QAPair]:
+    """Hasta `cuantos` preguntas sobre algo que no existe: un articulo despues del
+    ultimo, el documento con otro año, otro numero u otro tipo. `indice` (todo el
+    corpus) confirma que no existe; `vistas` (compartido entre documentos) evita
+    repetir una pregunta que otro documento ya invento."""
     if _skip_type(meta.get("tipo", "")):
         return []
 
     tipo, cita, _ = _doc_ref(meta)
-    la, La, de_la = _gender(tipo)
+    la, _, de_la = _gender(tipo)
     suf_q = "" if _is_national(meta.get("tipo", "")) else " de Unillanos"
     key = cita_key(meta)
     numero, anio = meta.get("numero", ""), meta.get("anio", "")
-    pairs: list[QAPair] = []
-
-    # 1. Articulo que no existe: un numero mas alto que el ultimo del documento.
     ultimo = indice.get(key, 0)
-    if ultimo:
-        falso = ultimo + rng.randint(5, 80)
-        pairs.append(_negativo(
-            f"¿Qué establece el artículo {falso} {de_la} {cita}{suf_q}?",
-            f"No tengo información sobre el artículo {falso} {de_la} {cita}. "
-            f"Es posible que ese artículo no exista; te sugiero verificar el número del artículo.",
-        ))
 
-    if not (numero.isdigit() and anio.isdigit()):
-        return pairs
+    def articulo():
+        n = ultimo + rng.randint(1, max(80, ultimo))
+        return (f"el artículo {n} {de_la} {cita}",
+                f"No tengo información sobre el artículo {n} {de_la} {cita}. "
+                f"Es posible que ese artículo no exista; te sugiero verificar el número del artículo.")
 
-    # 2. El año no coincide: mismo tipo y numero, otro año que no este en el corpus.
-    otro_anio = int(anio) + rng.choice([-3, -2, -1, 1, 2, 3])
-    if (key[0], key[1], str(otro_anio)) not in indice:
-        cita_mala = f"{tipo} No. {numero} de {otro_anio}"
-        pairs.append(_negativo(
-            f"¿De qué trata {la} {cita_mala}{suf_q}?",
-            f"No tengo información sobre {la} {cita_mala}. Conozco {la} {cita}, "
-            f"así que es posible que el año no coincida; te sugiero verificarlo.",
-        ))
+    def otro_anio():
+        otro = int(anio) + rng.choice([-5, -4, -3, -2, -1, 1, 2, 3, 4, 5])
+        if (key[0], key[1], str(otro)) in indice:
+            return None
+        return (f"{la} {tipo} No. {numero} de {otro}",
+                f"No tengo información sobre {la} {tipo} No. {numero} de {otro}. Conozco {la} {cita}, "
+                f"así que es posible que el año no coincida; te sugiero verificarlo.")
 
-    # 3. Numero que no existe: mismo tipo y año, otro numero que no este en el corpus.
-    otro_num = int(numero) + rng.randint(1, 40)
-    if (key[0], str(otro_num), anio) not in indice:
-        cita_mala = f"{tipo} No. {otro_num} de {anio}"
-        pairs.append(_negativo(
-            f"¿Qué regula {la} {cita_mala}{suf_q}?",
-            f"No tengo información sobre {la} {cita_mala}. "
-            f"Te sugiero verificar el número y el año del documento.",
-        ))
+    def otro_numero():
+        otro = int(numero) + rng.randint(1, 60)
+        if (key[0], str(otro), anio) in indice:
+            return None
+        return (f"{la} {tipo} No. {otro} de {anio}",
+                f"No tengo información sobre {la} {tipo} No. {otro} de {anio}. "
+                f"Te sugiero verificar el número y el año del documento.")
 
+    def otro_tipo():
+        codigo = rng.choice([c for c in _TIPOS_CONFUNDIBLES if c != key[0]])
+        if (codigo, key[1], anio) in indice:
+            return None
+        nombre = _TIPOS_CONFUNDIBLES[codigo]
+        la_otro = _gender(nombre)[0]
+        al = "al" if la == "el" else "a la"
+        return (f"{la_otro} {nombre} No. {numero} de {anio}",
+                f"No tengo información sobre {la_otro} {nombre} No. {numero} de {anio}. "
+                f"Tal vez te refieres {al} {cita}.")
+
+    generadores = [articulo] if ultimo else []
+    if numero.isdigit() and anio.isdigit():
+        generadores += [otro_anio, otro_numero]
+        if key[0] in _TIPOS_CONFUNDIBLES:
+            generadores.append(otro_tipo)
+    if not generadores:
+        return []
+
+    # Las mismas dos redacciones de los positivos (A1 y A2).
+    pairs = []
+    for _ in range(cuantos * 10):
+        if len(pairs) >= cuantos:
+            break
+        nuevo = rng.choice(generadores)()
+        if nuevo is None:
+            continue
+        asunto, respuesta = nuevo
+        pregunta = rng.choice([f"¿Qué establece {asunto}{suf_q}?", f"¿Qué dice {asunto.replace(' No. ', ' ')}?"])
+        if pregunta not in vistas:
+            vistas.add(pregunta)
+            pairs.append(_negativo(pregunta, respuesta))
     return pairs
 
 

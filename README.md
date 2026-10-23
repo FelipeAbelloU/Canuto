@@ -20,15 +20,17 @@ PDF/  ->  data/extracted/*.md  ->  dataset_alpaca.json  ->  train/test  ->  adap
 1. **Extraccion**: los PDFs digitales se convierten a Markdown con pymupdf4llm y los
    escaneados con OCR (docling). El resultado conserva la estructura legal del
    documento (CONSIDERANDO, RESUELVE, ARTICULO, PARAGRAFO).
-2. **Dataset**: cada documento se recorre por articulos y se arman pares
-   pregunta-respuesta en formato alpaca. Tambien se agregan ejemplos negativos
-   (articulos o documentos que no existen, otras universidades, datos privados),
-   cuya respuesta es "No tengo informacion...", para que el modelo aprenda a
-   reconocer lo que no sabe en vez de inventar.
+2. **Dataset**: cada articulo da dos preguntas con cita y la misma respuesta (el
+   texto real del articulo). Los documentos clave suman preguntas abiertas, sin
+   cita: unas escritas a mano y otras generadas con Qwen y revisadas una por una.
+   Cada documento aporta tantos negativos como positivos (articulos o documentos
+   que no existen, tipo o año equivocado), cuya respuesta es "No tengo
+   informacion...", para que el modelo aprenda a reconocer lo que no sabe.
 3. **Entrenamiento**: fine-tuning con QLoRA (el modelo base se carga en 4 bits y solo
    se entrena el adaptador).
-4. **Evaluacion**: el adaptador se mide sobre el 30% apartado y sobre un conjunto de
-   preguntas fuera de dominio, para comparar configuraciones de hiperparametros.
+4. **Evaluacion**: el 30 % de prueba se separa por redaccion: cada articulo de la
+   prueba tiene otra redaccion en entrenamiento. Se suma un conjunto de preguntas
+   fuera de dominio para medir la alucinacion.
 5. **Uso**: la interfaz web en Django carga el modelo base mas el adaptador entrenado.
 
 ## Instalacion
@@ -61,6 +63,11 @@ python ui/django_chatbot/run.py           # interfaz web
 
 Despues de entrenar hay que apuntar `model.checkpoint_path` en `config/config.yaml`
 a la carpeta del adaptador.
+
+Herramientas que no son parte del recorrido normal: `scripts/revisar_numeros.py`
+(compara el numero impreso de cada documento con el del archivo, para llenar
+`config/correcciones_citas.tsv`) y `scripts/generar_preguntas_tema.py` (preguntas
+abiertas con Qwen; ya generadas y revisadas en `data/dataset/preguntas_tema.json`).
 
 ### Entrenamiento y evaluacion
 

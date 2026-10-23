@@ -1,13 +1,7 @@
-# Documentos clave: los que mas consultan los estudiantes. Reciben preguntas por
-# tema (sin cita) y tres redacciones por articulo. El resto del corpus solo lleva
-# preguntas con la cita del documento. Si un tema tiene varias versiones, va SOLO
-# la mas reciente (si no, la misma pregunta tendria respuestas distintas).
-# El PEI (AS 6/2021) y la Politica de Bienestar (AS 11/2024) no estan: su
-# contenido va en un anexo sin articulos y casi nada entra al dataset.
-# Formato: TIPO NUMERO AÑO | nombre comun
-#   TIPO NUMERO AÑO como en el frontmatter de los .md, ya corregido.
-#   El nombre va en la tercera redaccion ("¿Me puede explicar el articulo 5 del
-#   Reglamento Estudiantil de pregrado...?"), por eso lleva tildes y su articulo.
+# Documentos clave: reciben preguntas abiertas (generar_preguntas_tema.py). Si un
+# tema tiene varias versiones, va solo la mas reciente, o una pregunta tendria
+# dos respuestas. PEI y Politica de Bienestar no estan: su contenido es un anexo.
+# Formato: TIPO NUMERO AÑO | nombre comun (va en la instruccion a Qwen).
 ACUERDO_SUPERIOR 20 2021 | el Reglamento Estudiantil de pregrado
 ACUERDO_SUPERIOR 3 2023 | el Reglamento Estudiantil de posgrado
 ACUERDO_SUPERIOR 3 2021 | el Estatuto General

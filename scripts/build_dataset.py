@@ -72,17 +72,6 @@ def cargar_documentos(archivos: list[Path], correcciones: dict) -> tuple[list, s
     return docs, usadas, excluidos
 
 
-def cargar_clave(ruta: Path) -> dict:
-    """Lee config/documentos_clave.txt: (tipo, numero, año) -> nombre comun."""
-    clave = {}
-    for linea in ruta.read_text(encoding="utf-8").splitlines():
-        linea = linea.split("#")[0]
-        if "|" in linea:
-            cita, nombre = linea.split("|")
-            clave[tuple(cita.split())] = nombre.strip()
-    return clave
-
-
 def cargar_modificados(ruta: Path) -> dict:
     """Lee config/articulos_modificados.tsv: (tipo, numero, año) -> {articulo: (tipo, numero, año)}."""
     modificados: dict = {}
@@ -143,12 +132,11 @@ def main():
     print(f"Indice del corpus: {len(indice)} documentos distintos")
 
     citas = {cita_key(meta): cita_completa(meta) for _, meta, _ in docs}
-    clave = cargar_clave(root / "config/documentos_clave.txt")
     modificados = {doc: {art: citas.get(por) for art, por in arts.items()}
                    for doc, arts in cargar_modificados(root / "config/articulos_modificados.tsv").items()}
-    faltan = [d for d in clave if d not in citas] + [d for d in modificados if d not in citas]
+    faltan = [d for d in modificados if d not in citas]
     faltan += [(doc, art) for doc, arts in modificados.items() for art, cita in arts.items() if cita is None]
-    print(f"Documentos clave: {len(clave)} · documentos con articulos modificados: {len(modificados)}")
+    print(f"Documentos con articulos modificados: {len(modificados)}")
     for d in faltan:
         print(f"  OJO: no se encontro en el corpus: {d}")
     print()
@@ -156,6 +144,7 @@ def main():
     rng = random.Random(SEMILLA)
     all_pairs: list[QAPair] = []
     negativos: list[QAPair] = []
+    preguntas_negativas: set[str] = set()
     by_type: dict[str, int] = {}
     omitidos = 0
 
@@ -167,8 +156,8 @@ def main():
             continue
 
         key = cita_key(meta)
-        pairs = generate_heuristic(body, meta, clave.get(key, ""), modificados.get(key))
-        negs = generate_negatives(meta, indice, rng)
+        pairs = generate_heuristic(body, meta, modificados.get(key))
+        negs = generate_negatives(meta, indice, rng, len(pairs), preguntas_negativas)   # 1:1 por documento
 
         rel = src_path.relative_to(input_dir).as_posix()
         print(f"  [{tipo or '—'}] {rel}: {len(pairs)} pares QA + {len(negs)} negativos")

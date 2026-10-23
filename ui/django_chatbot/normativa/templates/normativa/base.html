@@ -6,12 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}CANUTO — Asistente Normativo Unillanos{% endblock %}</title>
 
-  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Paleta "Coral cálido" — rojo suavizado para mayor comodidad visual.
-    // Se redefine la escala `red` de Tailwind, así todos los `red-*` de los
-    // templates heredan el tono suave sin tocar cada archivo.
+    // Se redefine la escala `red` de Tailwind: todos los `red-*` toman este tono.
     tailwind.config = {
       darkMode: 'class',
       theme: {

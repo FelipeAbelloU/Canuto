@@ -19,8 +19,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "scripts"))
 
-from build_dataset import cargar_documentos, cargar_correcciones, cargar_clave, cargar_modificados
-from src.dataset.qa_builder import generate_heuristic, cita_key, _de
+from build_dataset import cargar_documentos, cargar_correcciones, cargar_modificados
+from src.dataset.qa_builder import generate_heuristic, cita_key
 
 MODELO = "Qwen/Qwen2.5-7B-Instruct"
 MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -60,6 +60,22 @@ Escribe 3 preguntas distintas que haría un estudiante o alguien de la universid
 - No menciones el número del artículo ni del acuerdo o la resolución.
 - Escríbelas como habla la gente: unas de tú, otras de usted; alguna puede contar su caso.
 - Una pregunta por línea, sin numerar y sin nada más.{extra}"""
+
+
+def cargar_clave(ruta: Path) -> dict:
+    """Lee config/documentos_clave.txt: (tipo, numero, año) -> nombre comun."""
+    clave = {}
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.split("#")[0]
+        if "|" in linea:
+            cita, nombre = linea.split("|")
+            clave[tuple(cita.split())] = nombre.strip()
+    return clave
+
+
+def _de(nombre: str) -> str:
+    """'de' + nombre, con la contraccion: 'el Estatuto' -> 'del Estatuto'."""
+    return "del " + nombre[3:] if nombre.startswith("el ") else "de " + nombre
 
 
 def piezas():
