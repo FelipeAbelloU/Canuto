@@ -24,6 +24,9 @@ from src.dataset.qa_builder import (
 
 # Fija para que los numeros falsos de los negativos salgan siempre iguales.
 SEMILLA = 42
+# Fuera en la corrida 1: ~1 de cada 4 preguntas de Qwen no la responde su articulo
+# y el juez no logro separarlas (ver calibracion_juez.json).
+USAR_PREGUNTAS_QWEN = False
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
@@ -175,7 +178,10 @@ def main():
 
     # B (Qwen) y E (a mano) toman la respuesta A de su articulo por "cita".
     respuesta_de = {p.question: p.answer for p in all_pairs}
-    for archivo, familia in [("preguntas_tema.json", "B"), ("preguntas_frecuentes.json", "E")]:
+    abiertas_por_familia = [("preguntas_frecuentes.json", "E")]
+    if USAR_PREGUNTAS_QWEN:
+        abiertas_por_familia.append(("preguntas_tema.json", "B"))
+    for archivo, familia in abiertas_por_familia:
         ruta = root / "data/dataset" / archivo
         if not ruta.exists():
             continue
