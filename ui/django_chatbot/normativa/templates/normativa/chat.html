@@ -116,12 +116,10 @@
 <script>
   const contenedor = () => document.getElementById('chat-messages').querySelector('.space-y-6');
 
-  // Escapa el texto para que no se interprete como HTML.
   function escaparHtml(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Agrega un globo de mensaje al chat.
   function agregarMensaje(rol, texto) {
     document.getElementById('welcome-screen').classList.add('hidden');
     const fila = document.createElement('div');
@@ -143,7 +141,6 @@
     document.getElementById('chat-messages').scrollTop = 99999;
   }
 
-  // Muestra los tres puntitos mientras el modelo responde.
   function mostrarEscribiendo() {
     const div = document.createElement('div');
     div.id = 'escribiendo';
@@ -162,13 +159,11 @@
     document.getElementById('chat-messages').scrollTop = 99999;
   }
 
-  // --- Conversaciones -------------------------------------------------------
-  // Se guardan en el navegador (localStorage), como en ChatGPT: "Nueva
-  // conversacion" abre una vacia sin borrar las anteriores. El modelo NO las
-  // recibe: contesta cada pregunta por separado, como se entreno.
+  // Conversaciones en localStorage. El modelo no las recibe: contesta cada
+  // pregunta por separado, como se entreno.
   const CLAVE = 'canuto-conversaciones';
-  const MAX_CONVERSACIONES = 20;   // al pasarse se borra la mas vieja
-  let actual = null;               // id de la conversacion abierta (null = vacia)
+  const MAX_CONVERSACIONES = 20;
+  let actual = null;   // id de la conversacion abierta (null = vacia)
 
   // Si el navegador bloquea localStorage, el chat funciona igual sin guardar.
   function leerConversaciones() {
@@ -178,9 +173,7 @@
     try { localStorage.setItem(CLAVE, JSON.stringify(lista.slice(0, MAX_CONVERSACIONES))); } catch (e) {}
   }
 
-  // Agrega un mensaje a la conversacion `id` (si es null la crea, con la
-  // pregunta como titulo). La conversacion usada sube al principio de la lista;
-  // quien llama vuelve a pintar la lista.
+  // Con id null crea la conversacion. No repinta la lista: lo hace quien llama.
   function guardarMensaje(id, rol, texto) {
     const lista = leerConversaciones();
     let conv = lista.find(c => c.id === id);
@@ -190,7 +183,6 @@
     return conv.id;
   }
 
-  // Dibuja la lista de la barra lateral, con la abierta resaltada.
   function pintarLista() {
     const caja = document.getElementById('lista-conversaciones');
     caja.innerHTML = '';
@@ -207,7 +199,6 @@
     });
   }
 
-  // Quita los mensajes de la pantalla y vuelve a mostrar la bienvenida.
   function limpiarPantalla() {
     Array.from(contenedor().children).forEach(el => { if (el.id !== 'welcome-screen') el.remove(); });
     document.getElementById('welcome-screen').classList.remove('hidden');
@@ -234,7 +225,6 @@
     if (id === actual) nuevaConversacion(); else pintarLista();
   }
 
-  // Envia la pregunta al servidor y muestra la respuesta.
   async function enviarPregunta() {
     const input = document.getElementById('chat-input');
     const pregunta = input.value.trim();
@@ -243,8 +233,7 @@
     input.value = '';
     input.disabled = true;
     agregarMensaje('user', pregunta);
-    // Se recuerda el id: si mientras responde el usuario abre otra
-    // conversacion, la respuesta se guarda en la que hizo la pregunta.
+    // Si el usuario cambia de conversacion mientras responde, la respuesta va a esta.
     const id = actual = guardarMensaje(actual, 'user', pregunta);
     pintarLista();
     mostrarEscribiendo();

@@ -26,9 +26,7 @@ def to_alpaca(pair: QAPair) -> dict:
             "familia": pair.familia}
 
 
-# ---------------------------------------------------------------------------
-# Tipos de documento que NO generan buenos QA (tablas, mallas, planes de estudio)
-# ---------------------------------------------------------------------------
+# Tipos que son solo tablas (mallas, planes de estudio): no dan preguntas utiles.
 _SKIP_TYPES = {
     "MALLA_CURRICULAR", "Malla_curricular",
     "PLAN_DE_ESTUDIOS_DEL_PROGRAMA", "Plan_de_estudios_del_programa",
@@ -37,13 +35,9 @@ _SKIP_TYPES = {
 
 
 def _skip_type(tipo: str) -> bool:
-    # Estos tipos son tablas: el texto plano no produce preguntas utiles.
     return tipo in _SKIP_TYPES
 
 
-# ---------------------------------------------------------------------------
-# Concordancia gramatical segun el tipo (la Resolucion / el Acuerdo)
-# ---------------------------------------------------------------------------
 def _gender(tipo_legible: str) -> tuple[str, str, str]:
     """Devuelve (articulo, articulo_mayuscula, contraccion) para el tipo.
 
@@ -61,8 +55,7 @@ def _de(nombre: str) -> str:
     return "del " + nombre[3:] if nombre.startswith("el ") else "de " + nombre
 
 
-# Tipos que son legislacion NACIONAL, no normativa propia de Unillanos:
-# se citan sin "de Unillanos" para no atribuirle autoria equivocada.
+# Legislacion nacional: se cita sin "de Unillanos".
 _NATIONAL_HINTS = ("NACIONAL", "MINISTERIO", "_MEN", "CONPES", "LEY", "ORDENANZA", "CESU")
 
 
@@ -71,7 +64,6 @@ def _is_national(tipo: str) -> bool:
     return u == "LEY" or any(h in u for h in _NATIONAL_HINTS)
 
 
-# Un numero de articulo valido: arabigo, romano u ordinal escrito.
 _ROMAN_RE = re.compile(r"^[IVXLCDM]+$", re.IGNORECASE)
 _ORDINAL_WORDS = {
     "primero", "segundo", "tercero", "cuarto", "quinto", "sexto", "séptimo",
@@ -94,9 +86,6 @@ def _valid_num(n: str) -> str:
     return ""
 
 
-# ---------------------------------------------------------------------------
-# Parser de la estructura Markdown del documento
-# ---------------------------------------------------------------------------
 _H2_RE = re.compile(r"^##\s+(.+)$")
 _ART_RE = re.compile(r"^###\s+ART[IÍ]CULO\s*(.*)$", re.IGNORECASE)   # tolera "ARTICULO" del OCR
 _PAR_RE = re.compile(r"^####\s+PAR[AÁ]GRAFO\s*(.*)$", re.IGNORECASE)
@@ -105,8 +94,7 @@ _PAR_RE = re.compile(r"^####\s+PAR[AÁ]GRAFO\s*(.*)$", re.IGNORECASE)
 _RESOL = {"RESUELVE", "ACUERDA", "DECRETA", "DISPONE", "ORDENA", "RESOLVIÓ", "RESOLVIO"}
 # El resto de la numeracion con puntos queda al inicio del texto: "5.3.2.1.1. Titulo..."
 _PUNTOS_RE = re.compile(r"^(\d+(?:\.\d+)+)[.\s]+")
-# Cuantos encabezados se mira hacia adelante para ver si la numeracion se retoma.
-# Con 2, 3, 4, 6 o 10 da lo mismo; sin limite se traga articulos propios (Ley 1955).
+# Encabezados que se miran hacia adelante; sin limite se traga articulos propios.
 _VENTANA = 4
 _ORDINAL_VALOR = {
     "primero": 1, "segundo": 2, "tercero": 3, "cuarto": 4, "quinto": 5, "sexto": 6,
@@ -129,7 +117,6 @@ class DocStructure:
 
 
 def _join(lines: list[str]) -> str:
-    # Une las lineas de un bloque en un parrafo limpio.
     return re.sub(r"\s+", " ", " ".join(lines)).strip()
 
 
@@ -142,7 +129,6 @@ def _clean_art_num(raw: str) -> str:
 
 
 def _num_valor(num: str) -> int | None:
-    # Valor entero del numero para seguir la secuencia (None si no se puede).
     if num.isdigit():
         return int(num)
     return _ORDINAL_VALOR.get(num.lower())
@@ -219,11 +205,10 @@ def _parse_structure(body_md: str) -> DocStructure:
     for raw in lines:
         s = raw.rstrip()
 
-        # Titulo del documento (# ...): se ignora, ya esta en el frontmatter.
+        # El titulo ya esta en el frontmatter.
         if s.startswith("# ") and not s.startswith("## "):
             continue
 
-        # Articulo (### ARTICULO N) -> nuevo bloque de articulo.
         m_art = _ART_RE.match(s)
         if m_art:
             num = _clean_art_num(m_art.group(1))
@@ -236,15 +221,13 @@ def _parse_structure(body_md: str) -> DocStructure:
             target = articles[-1][1]
             continue
 
-        # Paragrafo (#### PARAGRAFO): pertenece al articulo actual, asi que su
-        # contenido se pliega dentro del bloque vigente con una etiqueta.
+        # El paragrafo se pliega dentro del articulo actual.
         m_par = _PAR_RE.match(s)
         if m_par:
             num_par = m_par.group(1).strip()
             target.append(f"Parágrafo{(' ' + num_par) if num_par else ''}:")
             continue
 
-        # Seccion (## CONSIDERANDO / RESUELVE / CAPITULO ...).
         m_h2 = _H2_RE.match(s)
         if m_h2 and not s.startswith("### "):
             name = m_h2.group(1).strip().upper()
@@ -254,7 +237,6 @@ def _parse_structure(body_md: str) -> DocStructure:
             target = sections[name]
             continue
 
-        # Linea de contenido normal.
         target.append(s)
 
     st = DocStructure()
@@ -265,8 +247,7 @@ def _parse_structure(body_md: str) -> DocStructure:
 
     propios, st.pegados = _ordenar_articulos([(num, _join(ls)) for num, ls in articles])
 
-    # Red de seguridad: numero invalido, repetido o sin texto -> ese articulo no genera
-    # pares. Nunca se inventa un numero con la posicion.
+    # Numero invalido, repetido o sin texto: el articulo se descarta, nunca se inventa.
     cuenta: dict[str, int] = {}
     for num, _ in propios:
         cuenta[num] = cuenta.get(num, 0) + 1
@@ -276,8 +257,7 @@ def _parse_structure(body_md: str) -> DocStructure:
         else:
             st.fuera.append(num)
 
-    # Huecos en la numeracion (1, 2, 4 -> falta el 3). Solo se reportan: el articulo
-    # anterior a un hueco puede traer pegado el texto del que falta (AS 20/2021, art. 64-65).
+    # Los huecos (1, 2, 4) solo se reportan: el anterior puede traer pegado el que falta.
     enteros = {int(n) for n, _ in st.articles if n.isdigit()}
     if enteros:
         st.huecos = [n for n in range(1, max(enteros) + 1) if n not in enteros]
@@ -291,8 +271,7 @@ def _extract_descripcion(header_lines: list[str]) -> str:
     if m:
         return re.sub(r"\s+", " ", m.group(1)).strip()
 
-    # Sin comillas (40 % de los documentos por OCR): desde la linea "Por el/la cual..."
-    # hasta la autoridad que firma ("EL CONSEJO ACADEMICO", "EL RECTOR", "En uso de...").
+    # Sin comillas (40 % por el OCR): de "Por el/la cual..." hasta la autoridad que firma.
     partes: list[str] = []
     for linea in header_lines:
         s = linea.strip()
@@ -309,9 +288,6 @@ def _extract_descripcion(header_lines: list[str]) -> str:
     return desc if 15 <= len(desc) <= 400 else ""
 
 
-# ---------------------------------------------------------------------------
-# Generador principal
-# ---------------------------------------------------------------------------
 def _doc_ref(meta: dict) -> tuple[str, str, str]:
     """Devuelve (tipo_legible, cita_corta, frase_completa) desde el frontmatter."""
     tipo = meta.get("tipo_legible") or meta.get("tipo", "") or "documento normativo"
@@ -326,14 +302,8 @@ def _doc_ref(meta: dict) -> tuple[str, str, str]:
     return tipo, cita, f"{cita} de la Universidad de los Llanos (Unillanos)"
 
 
-# ---------------------------------------------------------------------------
-# Articulos largos
-# ---------------------------------------------------------------------------
-# El chat genera hasta 1024 tokens (max_new_tokens). Una respuesta mas larga
-# nunca saldria completa, asi que se parte. Se mide en caracteres porque en el
-# portatil no esta el tokenizador. Con el de Qwen el texto normal da ~3,4
-# caracteres por token, pero el denso (numeros, siglas, ruido del OCR) baja a ~2.
-# Con 2.000 caracteres la respuesta mas larga del corpus queda en 972 tokens.
+# El modelo genera hasta 1024 tokens; el texto denso da ~2 caracteres por token, y
+# con 2.000 caracteres la respuesta mas larga del corpus queda en 972 tokens.
 LIMITE_RESPUESTA = 2000
 
 
@@ -341,8 +311,6 @@ def _quitar_tabla(texto: str, documento: str) -> tuple[str, str]:
     """Quita la tabla (lo que va entre la primera y la ultima "|") y devuelve
     (texto sin la tabla, frase que remite al documento)."""
     ini, fin = texto.find("|"), texto.rfind("|")
-    # Una frase fija: antes se adivinaba el tema de la tabla buscando palabras
-    # ("estudiante", "valor") en todo el articulo y salian etiquetas falsas.
     aviso = f" Este artículo incluye una tabla; para el detalle consulta {documento}."
     return (texto[:ini] + " " + texto[fin + 1:]).strip(), aviso
 
@@ -368,7 +336,7 @@ def _trozos(texto: str, limite: int) -> list[str]:
     literal ("a)"), un numeral ("2.") o un punto seguido, nunca a mitad de frase."""
     piezas = []
     for p in re.split(r"(?<=[.;:])\s+(?=[a-zñ]\)\s|\d{1,2}[.)]\s|[A-ZÁÉÍÓÚÑ¿])", texto):
-        # Ultimo recurso (tablas que el OCR leyo sin "|"): cortar entre palabras.
+        # Ultimo recurso (tablas que el OCR leyo sin "|"): entre palabras.
         while len(p) > limite:
             corte = p.rfind(" ", 0, limite)
             corte = corte if corte > 0 else limite
@@ -389,19 +357,9 @@ def _trozos(texto: str, limite: int) -> list[str]:
 
 def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
                        modificados: dict | None = None) -> list[QAPair]:
-    """Genera los pares QA fundamentados de un documento en Markdown (sin tope: todos sus articulos).
-
-    Estrategia:
-      1. Pregunta(s) general(es) sobre de que trata el documento.
-      2. Por articulo, varias redacciones de la pregunta con la MISMA respuesta
-         (el texto real del articulo). Asi split_dataset.py manda una a prueba
-         y deja otra en entrenamiento.
-      3. Fallback (documentos sin articulos): usar CONSIDERANDO/RESUELVE.
-    Todas las respuestas citan el documento por su numero y año exactos.
-
-    nombre_clave: nombre comun si es documento clave (config/documentos_clave.txt);
-    agrega la tercera redaccion. modificados: {articulo: cita del documento que
-    lo modifico} (config/articulos_modificados.tsv); la respuesta lo avisa.
+    """Pares de un documento: su descripcion y, por articulo, 2 o 3 redacciones
+    con la MISMA respuesta (asi split_dataset.py manda una a prueba). La tercera
+    solo si hay nombre_clave; modificados = {articulo: cita que lo modifico}.
     """
     if _skip_type(meta.get("tipo", "")):
         return []
@@ -409,7 +367,6 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
     tipo, cita, _ = _doc_ref(meta)
     la, La, de_la = _gender(tipo)
 
-    # Legislacion nacional: se cita sin atribuirla a Unillanos.
     nacional = _is_national(meta.get("tipo", ""))
     suf_q = "" if nacional else " de Unillanos"                       # sufijo de la pregunta
     entidad = "" if nacional else " de la Universidad de los Llanos (Unillanos)"  # en la respuesta
@@ -417,18 +374,13 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
     st = _parse_structure(body_md)
     pairs: list[QAPair] = []
 
-    # ── 1. Preguntas generales ────────────────────────────────────────────
     if st.descripcion:
-        # Solo la descripcion: antes se pegaba el articulo 1 completo y 1.536
-        # respuestas pasaban del limite de lo que el modelo puede generar.
         intro_ans = f"{La} {cita}{entidad} es la norma «{st.descripcion}»."
         pairs.append(QAPair(f"¿De qué trata {la} {cita}{suf_q}?", intro_ans))
         pairs.append(QAPair(f"¿Qué regula {la} {cita}{suf_q}?", intro_ans))
 
-    # ── 2. Varios pares por articulo (el nucleo del dataset) ──────────────
-    # Redacciones: A1 con la cita formal; A2 como la escribe un estudiante (sin
-    # "No." ni "de Unillanos"); A3 solo en documentos clave, con su nombre comun
-    # y de usted. {0} = lo que se pregunta ("el artículo 5"), {1} = "(parte i de n)".
+    # A1 cita formal, A2 como escribe un estudiante, A3 nombre comun y de usted.
+    # {0} = "el artículo 5", {1} = "(parte i de n)".
     cita_simple = cita.replace(" No. ", " ")
     plantillas = [f"¿Qué establece {{0}} {de_la} {cita}{suf_q}{{1}}?",
                   f"¿Qué dice {{0}} {de_la} {cita_simple}{{1}}?"]
@@ -436,8 +388,6 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
         plantillas.append(f"¿Me puede explicar {{0}} {_de(nombre_clave)} ({cita_simple}){{1}}?")
     modificados = modificados or {}
 
-    # El parser ya garantiza un numero UNICO y valido por articulo (los dudosos
-    # quedan fuera), asi que no hay preguntas identicas con respuestas distintas.
     for raw_num, content in st.articles:
         num = _valid_num(raw_num)
         del_art = f"del artículo {num} {de_la} {cita}"
@@ -449,14 +399,11 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
             pairs.extend(QAPair(p.format(f"el artículo {num}", ""), a) for p in plantillas)
             continue
 
-        # Articulo largo. Primero se quita la tabla grande (el modelo no puede
-        # recitar un calendario o un plan de estudios sin inventar filas).
+        # Una tabla grande no se puede recitar sin inventar filas: se quita.
         aviso = ""
         if "|" in content:
             content, aviso = _quitar_tabla(content, f"{la} {cita}")
 
-        # Despues se parte en cuerpo + paragrafos, y si un pedazo sigue largo,
-        # en partes cortadas en un literal, numeral o punto seguido.
         cuerpo, paragrafos = _separar_paragrafos(content)
         nota = f" Además tiene {len(paragrafos)} parágrafo(s), que puedes consultar por separado." if paragrafos else ""
         unidades = [(f"el artículo {num}", inicio, cuerpo, aviso + nota + modif)]
@@ -472,11 +419,7 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
                 respuesta = f"{inicio}{parte} {trozo}{fin}"
                 pairs.extend(QAPair(p.format(objeto, parte), respuesta) for p in plantillas)
 
-    # ── 3. Fallback: documentos sin articulos (actas, comunicados) ────────
-    # Antes se cortaban en seco a los 1.200 caracteres (a mitad de palabra); ahora
-    # se parten igual que los articulos largos.
-    # La pregunta "¿Desde cuando rige?" se quito: casi siempre decia "a partir de
-    # la fecha de su expedicion" sin la fecha, y ya esta en el articulo de vigencia.
+    # Documentos sin articulos (actas, comunicados).
     if not st.articles:
         cuerpo = st.resuelve or st.considerando or st.descripcion
         unidades = []
@@ -496,13 +439,8 @@ def generate_heuristic(body_md: str, meta: dict, nombre_clave: str = "",
     return pairs
 
 
-# ---------------------------------------------------------------------------
-# Ejemplos negativos: preguntas cuya respuesta correcta es "no tengo informacion"
-# ---------------------------------------------------------------------------
-# Sin estos pares el modelo nunca aprende que puede decir que no sabe: si le
-# preguntan por un articulo o un documento que no existe, contesta igual con
-# texto de otro documento. Todos los negativos empiezan igual ("No tengo
-# informacion" o "No puedo") para que sea facil reconocerlos al evaluar.
+# Negativos: sin ellos el modelo nunca aprende a decir que no sabe. Empiezan
+# siempre con "No tengo informacion" o "No puedo" para reconocerlos al evaluar.
 
 def cita_completa(meta: dict) -> str:
     """La cita con su articulo: 'el Acuerdo Superior No. 9 de 2022'."""
@@ -528,13 +466,8 @@ def _negativo(pregunta: str, respuesta: str) -> QAPair:
 
 
 def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
-    """Tres pares negativos por documento: un articulo que no existe, el mismo
-    documento con otro año y otro numero del mismo tipo y año.
-
-    `indice` tiene todos los documentos del corpus con su ultimo articulo, asi
-    se comprueba que lo que se pregunta de verdad no esta en el corpus. Se mira
-    el corpus entero y no solo este archivo porque hay documentos repetidos, y
-    una copia puede traer mas articulos que la otra.
+    """Un articulo que no existe, el documento con otro año y otro numero.
+    `indice` (todo el corpus) confirma que lo preguntado de verdad no existe.
     """
     if _skip_type(meta.get("tipo", "")):
         return []
@@ -582,10 +515,8 @@ def generate_negatives(meta: dict, indice: dict, rng) -> list[QAPair]:
     return pairs
 
 
-# Listas para los negativos generales (no dependen de ningun documento).
-# OJO: son distintas a las de data/dataset/preguntas_fuera_dominio.json, que es
-# el examen. Si se repitieran, el modelo veria las preguntas del examen al
-# entrenar y la tasa de alucinacion saldria mejor de lo que es.
+# Distintas a las de preguntas_fuera_dominio.json (el examen), o la tasa de
+# alucinacion saldria mejor de lo que es.
 OTRAS_UNIVERSIDADES = [
     "la Universidad del Magdalena", "la Universidad del Atlántico", "la Universidad de Pamplona",
     "la Universidad del Quindío", "la Universidad de Sucre", "la Universidad de La Guajira",
@@ -650,11 +581,7 @@ RESPUESTA_CULTURA = ("No puedo ayudarte con eso: solo respondo sobre la normativ
 
 def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 150) -> list[QAPair]:
     """Negativos que no salen de ningun documento: otras universidades, datos
-    de Unillanos que no estan en el corpus, datos privados, documentos con
-    numeros o años imposibles y cultura general.
-
-    La cultura general se rechaza siempre con la misma respuesta: CANUTO solo
-    responde sobre normativa. Las preguntas vienen de preguntas_generales.json.
+    fuera del corpus o privados, documentos imposibles y cultura general.
     """
     pairs: list[QAPair] = []
 
@@ -672,8 +599,7 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
     for q in DATOS_PRIVADOS:
         pairs.append(_negativo(q, RESPUESTA_PRIVADOS))
 
-    # Documentos imposibles: numero de 4 cifras y un año antes de que existiera
-    # la universidad (1974) o muy en el futuro.
+    # Numero de 4 cifras y un año antes de la universidad (1974) o muy futuro.
     for _ in range(n_absurdos):
         tipo = rng.choice(TIPOS_FALSOS)
         la, _, _ = _gender(tipo)
@@ -691,14 +617,8 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
     return pairs
 
 
-# ---------------------------------------------------------------------------
-# Datos personales: cedulas, pasaportes y codigos de estudiante
-# ---------------------------------------------------------------------------
-# Las resoluciones de exoneraciones, tutelas o intercambios traen la cedula o el
-# pasaporte del estudiante. Se cambia SOLO el numero por "(dato reservado)" y se
-# deja la frase, asi la respuesta se sigue entendiendo. Los nombres y los correos
-# institucionales se dejan (son publicos). Se usa [ \t] y no \s porque las
-# tablas traen cientos de espacios seguidos y la busqueda se vuelve eterna.
+# Datos personales: se cambia solo el numero por "(dato reservado)". [ \t] y no
+# \s porque las tablas traen cientos de espacios y la busqueda se vuelve eterna.
 _DATOS_PERSONALES_RE = [
     # "cedula de ciudadania N° 1.121.904.438", "C.C. 40.123.456", "1'123.512.874"
     re.compile(r"((?:c[ée]dula(?:[ \t]+de[ \t]+ciudadan[íi]a)?|\bC\.[ \t]?C\.?)[ \t]*"
@@ -711,10 +631,8 @@ _DATOS_PERSONALES_RE = [
                re.IGNORECASE),
 ]
 
-# Tablas con listas de estudiantes: "| JUAN PEREZ GOMEZ | 1.116.864.141 | 12100234 |".
-# Ahi el numero va sin la palabra "cedula". Si el texto trae una fila asi (nombre
-# en mayusculas y luego un numero), se tapan las celdas que son solo un numero de
-# 7 a 12 cifras. Las tablas de presupuesto no tienen nombres y no se tocan.
+# Listados "| JUAN PEREZ GOMEZ | 1.116.864.141 |": el numero va sin "cedula". Si hay
+# una fila asi se tapan las celdas de 7 a 12 cifras; el presupuesto no se toca.
 _FILA_PERSONA_RE = re.compile(
     r"\|[ \t*]*[A-ZÁÉÍÓÚÑ]{2,}(?:[ \t]+[A-ZÁÉÍÓÚÑ]{2,}){1,5}[ \t*]*\|"
     r"[ \t*]*(?:\d{1,3}[.'’]\d{3}[.'’]\d{3}|\d{7,12})[ \t*]*\|")
@@ -731,7 +649,6 @@ def enmascarar(texto: str) -> str:
 
 
 def save_dataset(pairs: list[QAPair], output_path: str | Path) -> None:
-    """Guarda el dataset en un JSON con formato alpaca."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     entries = [to_alpaca(p) for p in pairs]

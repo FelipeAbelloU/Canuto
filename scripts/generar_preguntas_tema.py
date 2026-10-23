@@ -1,23 +1,15 @@
 """Familia B: preguntas abiertas (sin cita) para los documentos clave.
 
-Qwen2.5-7B SIN entrenar lee cada articulo de los documentos clave y escribe 3
-preguntas como las haria un estudiante ("¿Que nota necesito para homologar?").
-Qwen solo escribe PREGUNTAS: la respuesta es siempre el texto real del articulo,
-la misma de las preguntas con cita, asi que no puede inventar nada.
+Qwen2.5-7B sin entrenar escribe 3 preguntas por articulo, como las haria un
+estudiante. Solo escribe la pregunta: la respuesta es el texto real del
+articulo. Las preguntas pasan por filtros y por un juez, y se guardan en
+data/dataset/preguntas_tema.json (versionado; build_dataset.py usa las "ok").
 
-Las preguntas pasan por filtros (forma, sin cita, nivel pregrado/posgrado, sin
-choques entre articulos y que apunten a su articulo) y por un juez: Qwen dice
-SI o NO a si el fragmento responde la pregunta. Se guardan en
-data/dataset/preguntas_tema.json, que se versiona en git y se revisa a mano.
-build_dataset.py usa solo las que tienen "filtro": "ok".
-
-Corre en la workstation (GPU). Nunca a la vez que un entrenamiento: la tarjeta
-es compartida. Tarda ~1 hora.
-
-Uso:
-    python scripts/generar_preguntas_tema.py
+Uso (en la workstation, nunca a la vez que un entrenamiento):
+    python scripts/generar_preguntas_tema.py               # genera, ~1 h de GPU
     python scripts/generar_preguntas_tema.py --refiltrar   # vuelve a filtrar sin Qwen
-    python scripts/generar_preguntas_tema.py --juez        # Qwen revisa las "ok" (~15 min, GPU)
+    python scripts/generar_preguntas_tema.py --juez        # Qwen juzga, ~15 min de GPU
+    python scripts/generar_preguntas_tema.py --calibrar    # elige el umbral, sin GPU
 """
 import json
 import re
@@ -35,11 +27,11 @@ MODELO = "Qwen/Qwen2.5-7B-Instruct"
 MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 SALIDA = RAIZ / "data/dataset/preguntas_tema.json"
 SEMILLA = 42
-TOP_IDA_Y_VUELTA = 3   # el articulo de la pregunta debe quedar entre los 3 mas parecidos
+TOP_IDA_Y_VUELTA = 3
+UMBRAL_JUEZ = 0.5   # se fija con --calibrar
 
-# Regla de nivel. Sin nivel, la pregunta se entiende de pregrado; por eso las de
-# posgrado lo deben decir y las de pregrado no pueden decir posgrado. Si no, la
-# misma pregunta tendria dos respuestas (los dos reglamentos dicen cosas distintas).
+# Sin nivel, una pregunta se entiende de pregrado: las de posgrado lo deben decir
+# y las de pregrado no pueden decirlo, o una pregunta tendria dos respuestas.
 POSGRADO = {("ACUERDO_SUPERIOR", "3", "2023"), ("ACUERDO_ACADEMICO", "11", "2025")}
 PREGRADO = {("ACUERDO_SUPERIOR", "20", "2021"), ("ACUERDO_ACADEMICO", "3", "2023"),
             ("ACUERDO_ACADEMICO", "16", "2025"), ("ACUERDO_SUPERIOR", "1", "2015")}
@@ -47,32 +39,40 @@ FCBI = {("RESOLUCION_CONSEJO_DE_FACULTAD_-_FCBI", "61", "2025")}
 NIVEL_RE = re.compile(r"posgrado|maestr[ií]a|especializaci[oó]n|doctorado", re.IGNORECASE)
 FCBI_RE = re.compile(r"FCBI|Ciencias B[aá]sicas", re.IGNORECASE)
 
-# Una pregunta abierta no trae cita: ni "articulo 46" ni "Acuerdo 20 de 2021".
 CITA_RE = re.compile(r"art[ií]culo\s*\d|\b(acuerdo|resoluci[oó]n)\b[^?]{0,30}\d|\bde\s+(19|20)\d\d\b",
                      re.IGNORECASE)
-# Preguntas que solo se entienden leyendo el fragmento ("segun este acuerdo",
-# "estas actividades") o que le piden opinion o experiencia al bot.
+# Preguntas que solo se entienden con el fragmento delante, o que piden opinion.
 CONTEXTO_RE = re.compile(r"\b(este|esta|estos|estas|dicho|dicha)\s+(acuerdo|reglamento|estatuto|art[ií]culo|"
                          r"fragmento|texto|documento|norma|resoluci[oó]n|modificaci[oó]n|actividades|procesos|"
                          r"casos|requisitos|plan|sistema|recursos)\b|"
                          r"seg[uú]n (el|este) (acuerdo|fragmento|texto|art[ií]culo)", re.IGNORECASE)
 OPINION_RE = re.compile(r"\b(tu|su) (experiencia|historia)\b|\bhas visto\b|\bha participado\b|\bcrees que\b|"
                         r"\bopinas\b|\busted ha\b|\brecomendar[ií]as\b|\bcompart[ií] un caso\b", re.IGNORECASE)
-# Qwen a veces se pasa a otro idioma (salieron preguntas en chino).
+# Qwen a veces cambia de idioma (salieron preguntas en chino).
 OTRO_IDIOMA_RE = re.compile(r"[^\x00-ɏ¿¡“”‘’–—…°ºª]")
 
-# Marca de los articulos largos partidos: "(parte 2 de 3) ...".
 PARTE_RE = re.compile(r"^\(parte \d+ de \d+\)\s*")
-# Articulos de vigencia o derogatorias: nadie pregunta por ellos.
 VIGENCIA_RE = re.compile(r"^(vigencia|el presente|la presente|rige)", re.IGNORECASE)
 
-JUEZ = """Fragmento {de_nombre} de la Universidad de los Llanos:
+# Los ejemplos NO son trampas del mismo tema y otra cosa: sin ellos el juez
+# decia SI a casi todo lo que compartia tema con el fragmento.
+JUEZ = """Decide si el fragmento responde la pregunta. Contesta NO si la pregunta da por hecho algo que el fragmento no dice, o pregunta por otra cosa del mismo tema.
 
-"{texto}"
+Fragmento: "El estudiante podrá cancelar cursos hasta dos semanas después del inicio formal de clases."
+Pregunta: "¿Hasta cuándo puedo cancelar una materia?"
+Respuesta: SÍ
 
+Fragmento: "Son deberes de los estudiantes: cumplir los compromisos de su matrícula y respetar a la comunidad universitaria."
+Pregunta: "¿Qué derechos tengo como estudiante?"
+Respuesta: NO
+
+Fragmento: "La matrícula de honor se otorga al estudiante con el mayor promedio de su semestre que no haya perdido ningún curso."
+Pregunta: "¿Cuánto descuento me dan si obtengo el grado de honor?"
+Respuesta: NO
+
+Fragmento {de_nombre} de la Universidad de los Llanos: "{texto}"
 Pregunta: "{pregunta}"
-
-¿El fragmento responde directamente esta pregunta, sin necesitar información de otra parte? Contesta solo SÍ o NO."""
+Respuesta:"""
 
 INSTRUCCION = """Este es un fragmento {de_nombre} de la Universidad de los Llanos:
 
@@ -85,12 +85,8 @@ Escribe 3 preguntas distintas que haría un estudiante o alguien de la universid
 
 
 def piezas():
-    """Las piezas (articulo, paragrafo o parte) de los documentos clave, mas los
-    articulos de los documentos que modificaron a alguno de ellos.
-
-    Cada pieza: {"cita": pregunta A1, "respuesta", "texto", "nombre", "doc"}. La
-    pregunta A1 es la llave con la que build_dataset.py encuentra la respuesta.
-    """
+    """Articulos, paragrafos y partes de los documentos clave y de los que los
+    modificaron. "cita" (la pregunta A1) es la llave que usa build_dataset.py."""
     correcciones = cargar_correcciones(RAIZ / "config/correcciones_citas.tsv")
     clave = cargar_clave(RAIZ / "config/documentos_clave.txt")
     modificados = cargar_modificados(RAIZ / "config/articulos_modificados.tsv")
@@ -106,21 +102,19 @@ def piezas():
         viejos = modificados.get(key, {})   # articulos de este documento que ya cambiaron
         if key in clave:
             nombre = clave[key]
-        elif key in modificadores:
-            # Se toma el nivel del documento clave que modifica.
+        elif key in modificadores:   # hereda el nivel del documento clave
             nombre = f"un acuerdo que modifica {clave[modificadores[key]]}"
             key = modificadores[key]
         else:
             continue
 
-        # La primera pregunta de cada respuesta es la A1 (con la cita formal).
-        vistas = set()
+        vistas = set()   # la primera pregunta de cada respuesta es la A1
         for par in generate_heuristic(body, meta):
             if par.answer in vistas or "se establece:" not in par.answer:
                 continue
             vistas.add(par.answer)
             texto = par.answer.split("se establece:", 1)[1].strip()
-            # Los articulos viejos (modificados) no: salen del documento que los cambio.
+            # Los articulos modificados salen del documento que los cambio.
             articulo = re.search(r"artículo (\S+) d", par.question).group(1)
             if VIGENCIA_RE.search(PARTE_RE.sub("", texto)) or articulo in viejos:
                 continue
@@ -130,19 +124,18 @@ def piezas():
 
 
 def cargar_qwen():
-    """Qwen2.5-7B en 4 bits, como en la inferencia, para que quepa en los 16 GB."""
+    """En 4 bits, como en la inferencia, para que quepa en los 16 GB."""
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16)
-    torch.manual_seed(SEMILLA)   # con temperatura: asi la generacion se puede repetir
+    torch.manual_seed(SEMILLA)
     tokenizer = AutoTokenizer.from_pretrained(MODELO)
     modelo = AutoModelForCausalLM.from_pretrained(MODELO, quantization_config=quant, device_map="cuda")
     return modelo, tokenizer
 
 
 def instruccion(pieza):
-    """Arma lo que se le pide a Qwen para una pieza."""
     extra = ""
     if pieza["doc"] in POSGRADO:
         extra = "\n- Cada pregunta debe decir que es de posgrado, maestría, especialización o doctorado."
@@ -152,26 +145,20 @@ def instruccion(pieza):
 
 
 def preguntar(modelo, tokenizer, pieza):
-    """Le pide a Qwen 3 preguntas sobre la pieza y devuelve las lineas que escribio."""
     import torch
     prompt = tokenizer.apply_chat_template([{"role": "user", "content": instruccion(pieza)}],
                                            tokenize=False, add_generation_prompt=True)
     entrada = tokenizer([prompt], return_tensors="pt").to("cuda")
-    # Con temperatura las 3 preguntas salen distintas entre si.
-    with torch.no_grad():
+    with torch.no_grad():   # con temperatura, para que las 3 salgan distintas
         salida = modelo.generate(**entrada, max_new_tokens=200, do_sample=True,
                                  temperature=0.7, top_p=0.9, pad_token_id=tokenizer.eos_token_id)
     generado = tokenizer.decode(salida[0][entrada["input_ids"].shape[-1]:], skip_special_tokens=True)
-    # Se quitan numeraciones o viñetas que Qwen ponga a pesar de la instruccion.
+    # Qwen numera a veces aunque se le pida que no.
     return [re.sub(r"^\s*(\d+[.)]|[-*•])\s*", "", l).strip() for l in generado.splitlines() if l.strip()]
 
 
 def filtro(pregunta, doc):
-    """Devuelve "ok" o la razon por la que se descarta (filtros 1 a 3).
-
-    La pregunta puede empezar contando el caso ("Si perdi una materia, ¿puedo...?"):
-    basta con que tenga el "¿" y termine en "?".
-    """
+    """"ok" o la razon del descarte. Vale empezar contando el caso: "Si..., ¿...?"."""
     if not ("¿" in pregunta and pregunta.endswith("?") and 15 <= len(pregunta) <= 250):
         return "forma"
     if OTRO_IDIOMA_RE.search(pregunta):
@@ -192,7 +179,7 @@ def filtro(pregunta, doc):
 
 
 def quitar_choques(preguntas):
-    """Filtro 4: la misma pregunta para dos piezas distintas es una contradiccion."""
+    """La misma pregunta para dos piezas distintas es una contradiccion."""
     piezas_de = {}
     for p in preguntas:
         piezas_de.setdefault(p["pregunta"].lower(), set()).add(p["cita"])
@@ -202,11 +189,8 @@ def quitar_choques(preguntas):
 
 
 def ida_y_vuelta(preguntas, lista_piezas):
-    """Filtro 5: la pregunta debe parecerse mas a su pieza que a las otras del
-    MISMO documento. Si su pieza no queda entre las TOP_IDA_Y_VUELTA mas
-    parecidas, es ambigua. Se compara dentro del documento porque entre
-    documentos (pregrado y posgrado tienen articulos casi iguales) ya decide la
-    regla de nivel; comparando contra todos se botaban preguntas claras."""
+    """Su pieza debe estar entre las TOP_IDA_Y_VUELTA mas parecidas del mismo
+    documento. Entre documentos ya decide la regla de nivel."""
     from sentence_transformers import SentenceTransformer, util
     emb = SentenceTransformer(MODELO_EMBEDDINGS, device="cpu")
     doc_de = {p["cita"]: p["doc"] for p in lista_piezas}
@@ -232,7 +216,6 @@ def guardar_y_contar(preguntas):
 
 
 def refiltrar():
-    """Vuelve a pasar los filtros a las preguntas ya generadas, sin Qwen ni GPU."""
     lista = piezas()
     doc_de = {p["cita"]: p["doc"] for p in lista}
     with open(SALIDA, encoding="utf-8") as f:
@@ -246,24 +229,24 @@ def refiltrar():
 
 
 def aplicar_juez(preguntas):
-    """Las que el juez ya rechazo no vuelven a ser "ok" al refiltrar."""
     for p in preguntas:
-        if p["filtro"] == "ok" and p.get("juez") == "no":
+        if p["filtro"] == "ok" and p.get("p_si", 1) < UMBRAL_JUEZ:
             p["filtro"] = "juez dijo no"
 
 
 def juzgar():
-    """Filtro 6: Qwen lee el fragmento y la pregunta y dice si la responde. El
-    embedding solo mide si se parecen; esto atrapa, por ejemplo, "expulsion"
-    contestada con un articulo de "suspension". Solo revisa las "ok" que no
-    tienen veredicto todavia y guarda el veredicto en "juez"."""
+    """Guarda en "p_si" la probabilidad que Qwen le da a SI: el fragmento
+    responde la pregunta. Leer la probabilidad, y no la palabra, permite un
+    umbral; con la palabra sola el juez decia SI a todo lo del mismo tema."""
     import torch
     lista = {p["cita"]: p for p in piezas()}
     with open(SALIDA, encoding="utf-8") as f:
         preguntas = json.load(f)
-    pendientes = [p for p in preguntas if p["filtro"] == "ok" and "juez" not in p]
+    pendientes = [p for p in preguntas if p["filtro"] in ("ok", "juez dijo no")]
     print(f"Preguntas para el juez: {len(pendientes)}")
     modelo, tokenizer = cargar_qwen()
+    si = tokenizer.encode("SÍ", add_special_tokens=False)[0]
+    no = tokenizer.encode("NO", add_special_tokens=False)[0]
     for i, p in enumerate(pendientes, 1):
         pieza = lista[p["cita"]]
         texto = JUEZ.format(de_nombre=_de(pieza["nombre"]), texto=PARTE_RE.sub("", pieza["texto"]),
@@ -271,16 +254,31 @@ def juzgar():
         prompt = tokenizer.apply_chat_template([{"role": "user", "content": texto}],
                                                tokenize=False, add_generation_prompt=True)
         entrada = tokenizer([prompt], return_tensors="pt").to("cuda")
-        with torch.no_grad():   # greedy: el mismo veredicto cada vez
-            salida = modelo.generate(**entrada, max_new_tokens=3, do_sample=False,
-                                     pad_token_id=tokenizer.eos_token_id)
-        veredicto = tokenizer.decode(salida[0][entrada["input_ids"].shape[-1]:], skip_special_tokens=True)
-        # Cualquier cosa que no empiece por "S" (NO, o una respuesta rara) se descarta.
-        p["juez"] = "si" if veredicto.strip().upper().startswith("S") else "no"
+        with torch.no_grad():
+            logits = modelo(**entrada).logits[0, -1, [si, no]].float()
+        p["p_si"] = round(torch.softmax(logits, dim=0)[0].item(), 4)
+        p.pop("juez", None)
+        p["filtro"] = "ok"
         print(f"  {i}/{len(pendientes)}", end="\r")
     print()
     aplicar_juez(preguntas)
     guardar_y_contar(preguntas)
+
+
+def calibrar():
+    """Con las 50 preguntas calificadas a mano, cuantas buenas y malas pasan
+    con cada umbral. Corre en el portatil, despues de --juez."""
+    with open(SALIDA, encoding="utf-8") as f:
+        p_si = {p["pregunta"]: p.get("p_si") for p in json.load(f)}
+    with open(RAIZ / "data/dataset/calibracion_juez.json", encoding="utf-8") as f:
+        muestra = [(p_si[p["pregunta"]], p["buena"]) for p in json.load(f)]
+    buenas = sum(b for _, b in muestra)
+    print(f"Muestra: {buenas} buenas, {len(muestra) - buenas} malas")
+    print("umbral  buenas que pasan  malas que pasan  % malas entre las que pasan")
+    for umbral in (0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99):
+        pasan = [b for p, b in muestra if p is not None and p >= umbral]
+        malas = len(pasan) - sum(pasan)
+        print(f"  {umbral:.2f}  {sum(pasan):8d}  {malas:15d}  {malas / max(len(pasan), 1):18.0%}")
 
 
 def main():
@@ -289,6 +287,9 @@ def main():
         return
     if "--juez" in sys.argv:
         juzgar()
+        return
+    if "--calibrar" in sys.argv:
+        calibrar()
         return
     if SALIDA.exists():
         print(f"Ya existe {SALIDA}: esta revisado a mano. Borralo a proposito si quieres regenerarlo.")

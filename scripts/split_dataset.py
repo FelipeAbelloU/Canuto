@@ -1,17 +1,8 @@
-"""Divide el dataset en entrenamiento (70%) y prueba (30%).
+"""Divide el dataset 70/30 por redaccion, no par por par.
 
-El 70/30 no se reparte al azar par por par: sin RAG el modelo solo sabe lo que
-vio al entrenar, asi que un articulo que cae entero en la prueba es una pregunta
-imposible. Por eso se reparte por REDACCION:
-
-  - Positivos: las redacciones de un mismo articulo tienen la misma respuesta,
-    asi que se agrupan por respuesta. De cada grupo con 2 o mas preguntas se
-    manda UNA a la prueba; las demas quedan en entrenamiento. Los grupos de una
-    sola pregunta van siempre a entrenamiento.
-  - Negativos: cada uno es independiente, se reparten al azar.
-
-Asi la prueba mide si el modelo responde un articulo que estudio cuando se lo
-preguntan con otras palabras. Semilla fija: siempre sale la misma division.
+Sin RAG, un articulo que cae entero en la prueba es una pregunta imposible. Las
+redacciones de un articulo comparten respuesta: de cada grupo de 2 o mas va UNA
+a la prueba y el resto a entrenamiento. Los negativos se reparten al azar.
 
 Uso:
     python scripts/split_dataset.py
@@ -45,7 +36,7 @@ def main():
     positivos = [r for r in data if r.get("familia", "A") != "negativo"]
     negativos = [r for r in data if r.get("familia", "A") == "negativo"]
 
-    # Positivos: grupos por respuesta (= un articulo o una parte de articulo).
+    # Un grupo = un articulo o una parte de articulo.
     grupos: dict[str, list] = {}
     for r in positivos:
         grupos.setdefault(r["output"], []).append(r)
@@ -56,21 +47,19 @@ def main():
     train, test = [], []
     for grupo in grupos:
         if len(test) < meta_pos and len(grupo) >= 2:
-            # Si el articulo tiene preguntas abiertas (B o E), va una de ellas:
-            # es como pregunta un estudiante real, sin citar el articulo.
+            # Mejor una abierta (B o E): asi pregunta un estudiante real.
             abiertas = [i for i, r in enumerate(grupo) if r.get("familia") in ("B", "E")]
             elegida = rng.choice(abiertas) if abiertas else rng.randrange(len(grupo))
             test.append(grupo.pop(elegida))
         train.extend(grupo)
     test_pos = len(test)
 
-    # Negativos: al azar.
     rng.shuffle(negativos)
     n_test_neg = int(len(negativos) * args.test_frac)
     test.extend(negativos[:n_test_neg])
     train.extend(negativos[n_test_neg:])
 
-    # Comprobaciones: sin estas dos cosas la nota de la prueba no vale.
+    # Sin estas dos condiciones la nota de la prueba no vale.
     preguntas_train = {r["instruction"] for r in train}
     respuestas_train = {r["output"] for r in train}
     repetidas = [r for r in test if r["instruction"] in preguntas_train]

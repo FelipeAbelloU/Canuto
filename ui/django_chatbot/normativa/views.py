@@ -11,21 +11,18 @@ from src.chat.pipeline import ChatPipeline
 
 RAIZ = Path(__file__).resolve().parent.parent.parent.parent
 
-# El modelo se carga una sola vez porque pesa varios GB. Las conversaciones las
-# guarda el navegador (chat.html); el modelo recibe solo la pregunta nueva,
-# porque se entreno con una pregunta a la vez.
+# El modelo se carga una vez (pesa varios GB). Las conversaciones viven en el
+# navegador; el modelo recibe solo la pregunta nueva, como se entreno.
 _modelo = None
 
 
 def _get_modelo():
-    """Carga el modelo la primera vez que se necesita."""
     global _modelo
     if _modelo is None:
         from src.config_loader import load_config
         from src.factory import create_model
 
         config = load_config(str(RAIZ / "config" / "config.yaml"))
-        # La ruta del checkpoint viene relativa a la raiz del proyecto.
         ruta = config.get("model", {}).get("checkpoint_path", "")
         if ruta and not Path(ruta).is_absolute():
             config["model"]["checkpoint_path"] = str(RAIZ / ruta)
@@ -34,16 +31,11 @@ def _get_modelo():
 
 
 def index(request):
-    """Pagina de inicio con el widget flotante."""
     return render(request, "normativa/index.html")
 
 
 def chat(request):
-    """Chat en pantalla completa."""
-    # Preguntas de ejemplo de la bienvenida, del Reglamento Estudiantil (AS 20 de
-    # 2021): dos abiertas (arts. 46 y 61) y una con cita (art. 38), para mostrar
-    # las dos formas de preguntar. La ultima es de un articulo que no existe,
-    # para mostrar que reconoce lo que no sabe.
+    # Dos abiertas, una con cita y una de un articulo que no existe (AS 20/2021).
     sugeridas = [
         "¿Cuál es la nota mínima para homologar una materia?",
         "¿Cuáles son los requisitos de grado?",
@@ -60,14 +52,13 @@ def chat(request):
 @csrf_exempt
 @require_POST
 def api_query(request):
-    """Recibe la pregunta y devuelve la respuesta del modelo."""
     try:
         data = json.loads(request.body)
         pregunta = data.get("question", "").strip()
         if not pregunta:
             return JsonResponse({"error": "Pregunta vacía."}, status=400)
 
-        # Pipeline nuevo en cada pregunta y sin historial (max_history 0).
+        # Sin historial: un pipeline nuevo por pregunta.
         respuesta = ChatPipeline(_get_modelo(), max_history=0).query(pregunta)
         return JsonResponse({"answer": respuesta["answer"]})
     except Exception as e:

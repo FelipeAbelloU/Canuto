@@ -2,25 +2,16 @@
 # Modelo fine-tuneado que responde las preguntas.
 
 model:
-  # Carpeta del adaptador LoRA que usan el chat y la web. Se llena despues de
-  # entrenar, con la carpeta que creo scripts/train_gpu.py (el nombre lo arma
-  # solo a partir de los hiperparametros), por ejemplo:
-  #   data/checkpoints/t2_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
-  # Vacio = no hay modelo cargado. scripts/evaluate.py no lo necesita: recibe la
-  # carpeta por --checkpoint, para poder medir varias corridas sin tocar esto.
-  checkpoint_path: ""    #IMPORTANTE 
+  # Adaptador que usan el chat y la web, p. ej. data/checkpoints/t2_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
+  # Vacio = sin modelo. evaluate.py no lo usa: recibe la carpeta por --checkpoint.
+  checkpoint_path: ""
   device: cuda
-  # OJO: estos tres NO afectan la evaluacion. evaluate.py fija los suyos por
-  # dentro (greedy, 1024 tokens) para que todas las corridas sean comparables
-  # aunque aqui se cambien para chatear.
-  max_new_tokens: 1024   # el dataset v2 parte las respuestas para que quepan (~900 tokens)
+  # Solo para chatear: evaluate.py fija los suyos para que las corridas se comparen.
+  max_new_tokens: 1024
   temperature: 0.3
   top_p: 0.85
-  # Instruccion fija que va antes de cada conversacion. ESTE si afecta todo: lo
-  # leen train_gpu.py, evaluate.py, el chat y la web. Tiene que ser el mismo
-  # texto con el que se entreno la corrida; cambiarlo = entrenar de nuevo.
-  # Ademas reemplaza el "You are Qwen, created by Alibaba Cloud..." que Qwen2.5
-  # pone solo cuando no hay system prompt.
+  # Lo usan entrenamiento, evaluacion, chat y web: cambiarlo obliga a reentrenar.
+  # Tambien reemplaza el "You are Qwen..." que Qwen2.5 pone si no hay uno.
   system_prompt: >-
     Eres CANUTO, el asistente de normativa de la Universidad de los Llanos (Unillanos).
     Respondes únicamente con base en la normativa de la universidad (acuerdos,
@@ -40,9 +31,7 @@ dataset:
   input_dir: "data/extracted"
   output_dir: "data/dataset"
 
-# Chat por terminal: cuantos turnos anteriores se le envian al modelo. En 0
-# porque el modelo se entrena con una pregunta a la vez (no hay ejemplos de
-# seguimiento). La web no lo usa: guarda las conversaciones en el navegador y
-# tambien manda solo la pregunta nueva.
+# Turnos anteriores que recibe el modelo en el chat por terminal. En 0 porque se
+# entrena con una pregunta a la vez.
 chat:
   max_history: 0

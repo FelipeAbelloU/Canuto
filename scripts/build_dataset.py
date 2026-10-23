@@ -1,9 +1,5 @@
-"""Genera el dataset de entrenamiento a partir de los .md extraidos.
-
-Lee los .md de data/extracted/ (con su frontmatter) y arma los pares
-pregunta-respuesta en data/dataset/dataset_alpaca.json. Ademas de los pares
-normales agrega ejemplos negativos (preguntas cuya respuesta es "no tengo
-informacion"), para que el modelo aprenda a reconocer lo que no sabe.
+"""Arma data/dataset/dataset_alpaca.json desde los .md de data/extracted/:
+pares con cita (A), preguntas abiertas (B y E) y negativos.
 
 Uso:
     python scripts/build_dataset.py
@@ -26,7 +22,7 @@ from src.dataset.qa_builder import (
     cita_key, cita_completa, ultimo_articulo, save_dataset, enmascarar, QAPair
 )
 
-# Semilla fija: los numeros falsos de los negativos salen siempre iguales.
+# Fija para que los numeros falsos de los negativos salgan siempre iguales.
 SEMILLA = 42
 
 
@@ -48,12 +44,8 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
 
 
 def cargar_correcciones(ruta: Path) -> dict:
-    """Lee config/correcciones_citas.tsv: ruta del PDF -> fila (accion, numero, anio).
-
-    Son los PDF que tienen en el nombre un numero distinto al impreso, revisados a
-    mano. No se renombra ningun PDF: la correccion se aplica aqui, asi un OCR nuevo
-    no la deshace. accion = "citar_como" (usar numero y anio) o "excluir" (duplicado).
-    """
+    """Ruta del PDF -> fila. Se corrige aqui y no renombrando el PDF, para que un
+    OCR nuevo no deshaga la correccion. accion: "citar_como" o "excluir"."""
     if not ruta.exists():
         return {}
     with open(ruta, encoding="utf-8") as f:
@@ -61,11 +53,8 @@ def cargar_correcciones(ruta: Path) -> dict:
 
 
 def cargar_documentos(archivos: list[Path], correcciones: dict) -> tuple[list, set, int]:
-    """Lee los .md y les aplica las correcciones de citas. Lo usan este script y
-    generar_preguntas_tema.py, para que los dos vean los mismos documentos.
-
-    Devuelve ([(ruta, meta, cuerpo)], filas de correcciones usadas, excluidos).
-    """
+    """Lee los .md con las citas corregidas. Lo usa tambien generar_preguntas_tema.py.
+    Devuelve ([(ruta, meta, cuerpo)], filas de correcciones usadas, excluidos)."""
     docs, usadas, excluidos = [], set(), 0
     for ruta in archivos:
         meta, body = _split_frontmatter(ruta.read_text(encoding="utf-8"))
@@ -136,10 +125,8 @@ def main():
         print(f"Filtro tipos: {', '.join(sorted(types_filter))}")
     print(f"Procesando {len(src_files)} documento(s)...\n")
 
-    # Primera pasada: indice de todos los documentos del corpus con su ultimo
-    # articulo. Con esto los negativos preguntan por cosas que de verdad no
-    # estan en el corpus. Si un documento esta repetido se queda el mayor.
-    # Antes de indexar se corrigen las citas de los PDF mal nombrados.
+    # Indice del corpus (cita -> ultimo articulo): los negativos preguntan por
+    # lo que de verdad no existe.
     correcciones = cargar_correcciones(root / "config/correcciones_citas.tsv")
     docs, usadas, excluidos = cargar_documentos(src_files, correcciones)
     indice: dict = {}
@@ -152,8 +139,6 @@ def main():
         print(f"  OJO: no se encontro el .md de {archivo}")
     print(f"Indice del corpus: {len(indice)} documentos distintos")
 
-    # Documentos clave (tercera redaccion) y articulos modificados (nota en la
-    # respuesta). Se avisa si alguna cita de las listas no esta en el corpus.
     citas = {cita_key(meta): cita_completa(meta) for _, meta, _ in docs}
     clave = cargar_clave(root / "config/documentos_clave.txt")
     modificados = {doc: {art: citas.get(por) for art, por in arts.items()}
@@ -188,10 +173,7 @@ def main():
         all_pairs.extend(pairs)
         negativos.extend(negs)
 
-    # Preguntas abiertas de los documentos clave: B las escribio Qwen
-    # (generar_preguntas_tema.py) y E son las frecuentes, escritas a mano. Cada
-    # una lleva la pregunta con cita de su articulo ("cita"), y con ella se toma
-    # la MISMA respuesta de la familia A.
+    # B (Qwen) y E (a mano) toman la respuesta A de su articulo por "cita".
     respuesta_de = {p.question: p.answer for p in all_pairs}
     for archivo, familia in [("preguntas_tema.json", "B"), ("preguntas_frecuentes.json", "E")]:
         ruta = root / "data/dataset" / archivo
@@ -206,14 +188,11 @@ def main():
         for p in sin_articulo:
             print(f"  OJO: no se encontro el articulo de: {p['pregunta']}")
 
-    # Negativos que no salen de ningun documento (otras universidades, datos
-    # privados, cultura general...).
     with open(root / "data/dataset/preguntas_generales.json", encoding="utf-8") as f:
         generales = json.load(f)
     negativos.extend(generate_generales(rng, generales))
 
-    # Ninguna pregunta del examen fuera de dominio puede quedar en el dataset:
-    # si el modelo la ve al entrenar, la tasa de alucinacion sale mejor de lo que es.
+    # Si el modelo viera el examen fuera de dominio, la alucinacion saldria mejor.
     with open(root / "data/dataset/preguntas_fuera_dominio.json", encoding="utf-8") as f:
         examen = {p["pregunta"] for p in json.load(f)}
     negativos = [p for p in negativos if p.question not in examen]
@@ -221,7 +200,7 @@ def main():
     n_negativos = len(negativos)
     all_pairs.extend(negativos)
 
-    # El corpus trae documentos duplicados, asi que se quitan las preguntas repetidas.
+    # El corpus trae documentos duplicados.
     seen_q: set[str] = set()
     unique_pairs: list[QAPair] = []
     for p in all_pairs:
@@ -232,9 +211,7 @@ def main():
     duplicados = len(all_pairs) - len(unique_pairs)
     all_pairs = unique_pairs
 
-    # Cedulas, pasaportes y codigos de estudiante -> "(dato reservado)". Varias
-    # preguntas comparten la misma respuesta, asi que cada texto se enmascara
-    # una sola vez (era el 70 % del tiempo del script).
+    # Cada respuesta se repite en 2 o 3 pares: se enmascara una sola vez.
     enmascarados = 0
     enmascarar_una_vez = lru_cache(maxsize=None)(enmascarar)
     for p in all_pairs:

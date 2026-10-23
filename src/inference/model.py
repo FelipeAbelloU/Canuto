@@ -99,7 +99,7 @@ class FineTunedModel:
         self._load()
         import torch
 
-        # El system prompt va siempre primero, igual que en el entrenamiento.
+        # Igual que en el entrenamiento.
         if self.system_prompt:
             messages = [{"role": "system", "content": self.system_prompt}] + messages
         text = self._tokenizer.apply_chat_template(
@@ -125,6 +125,5 @@ class FineTunedModel:
                 **opciones,
             )
 
-        # Se recorta el prompt para quedarse solo con lo que genero el modelo.
         generado = outputs[0][inputs["input_ids"].shape[-1]:]
         return self._tokenizer.decode(generado, skip_special_tokens=True).strip()
