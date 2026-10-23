@@ -2,14 +2,13 @@
 
 Qwen2.5-7B sin entrenar escribe 3 preguntas por articulo, como las haria un
 estudiante. Solo escribe la pregunta: la respuesta es el texto real del
-articulo. Las preguntas pasan por filtros y por un juez, y se guardan en
-data/dataset/preguntas_tema.json (versionado; build_dataset.py usa las "ok").
+articulo. Las preguntas pasan por filtros y por una revision pregunta por
+pregunta (campo "revision"), y se guardan en data/dataset/preguntas_tema.json
+(versionado; build_dataset.py usa las "ok").
 
 Uso (en la workstation, nunca a la vez que un entrenamiento):
     python scripts/generar_preguntas_tema.py               # genera, ~1 h de GPU
     python scripts/generar_preguntas_tema.py --refiltrar   # vuelve a filtrar sin Qwen
-    python scripts/generar_preguntas_tema.py --juez        # Qwen juzga, ~15 min de GPU
-    python scripts/generar_preguntas_tema.py --calibrar    # elige el umbral, sin GPU
 """
 import json
 import re
@@ -28,7 +27,6 @@ MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
 SALIDA = RAIZ / "data/dataset/preguntas_tema.json"
 SEMILLA = 42
 TOP_IDA_Y_VUELTA = 3
-UMBRAL_JUEZ = 0.5   # se fija con --calibrar
 
 # Sin nivel, una pregunta se entiende de pregrado: las de posgrado lo deben decir
 # y las de pregrado no pueden decirlo, o una pregunta tendria dos respuestas.
@@ -53,26 +51,6 @@ OTRO_IDIOMA_RE = re.compile(r"[^\x00-ɏ¿¡“”‘’–—…°ºª]")
 
 PARTE_RE = re.compile(r"^\(parte \d+ de \d+\)\s*")
 VIGENCIA_RE = re.compile(r"^(vigencia|el presente|la presente|rige)", re.IGNORECASE)
-
-# Los ejemplos NO son trampas del mismo tema y otra cosa: sin ellos el juez
-# decia SI a casi todo lo que compartia tema con el fragmento.
-JUEZ = """Decide si el fragmento responde la pregunta. Contesta NO si la pregunta da por hecho algo que el fragmento no dice, o pregunta por otra cosa del mismo tema.
-
-Fragmento: "El estudiante podrá cancelar cursos hasta dos semanas después del inicio formal de clases."
-Pregunta: "¿Hasta cuándo puedo cancelar una materia?"
-Respuesta: SÍ
-
-Fragmento: "Son deberes de los estudiantes: cumplir los compromisos de su matrícula y respetar a la comunidad universitaria."
-Pregunta: "¿Qué derechos tengo como estudiante?"
-Respuesta: NO
-
-Fragmento: "La matrícula de honor se otorga al estudiante con el mayor promedio de su semestre que no haya perdido ningún curso."
-Pregunta: "¿Cuánto descuento me dan si obtengo el grado de honor?"
-Respuesta: NO
-
-Fragmento {de_nombre} de la Universidad de los Llanos: "{texto}"
-Pregunta: "{pregunta}"
-Respuesta:"""
 
 INSTRUCCION = """Este es un fragmento {de_nombre} de la Universidad de los Llanos:
 
@@ -224,72 +202,20 @@ def refiltrar():
         p["filtro"] = filtro(p["pregunta"], doc_de[p["cita"]]) if p["cita"] in doc_de else "sin pieza"
     quitar_choques(preguntas)
     ida_y_vuelta(preguntas, lista)
-    aplicar_juez(preguntas)
+    aplicar_revision(preguntas)
     guardar_y_contar(preguntas)
 
 
-def aplicar_juez(preguntas):
+def aplicar_revision(preguntas):
+    """Las preguntas rechazadas en la revision no vuelven a ser "ok" al refiltrar."""
     for p in preguntas:
-        if p["filtro"] == "ok" and p.get("p_si", 1) < UMBRAL_JUEZ:
-            p["filtro"] = "juez dijo no"
-
-
-def juzgar():
-    """Guarda en "p_si" la probabilidad que Qwen le da a SI: el fragmento
-    responde la pregunta. Leer la probabilidad, y no la palabra, permite un
-    umbral; con la palabra sola el juez decia SI a todo lo del mismo tema."""
-    import torch
-    lista = {p["cita"]: p for p in piezas()}
-    with open(SALIDA, encoding="utf-8") as f:
-        preguntas = json.load(f)
-    pendientes = [p for p in preguntas if p["filtro"] in ("ok", "juez dijo no")]
-    print(f"Preguntas para el juez: {len(pendientes)}")
-    modelo, tokenizer = cargar_qwen()
-    si = tokenizer.encode("SÍ", add_special_tokens=False)[0]
-    no = tokenizer.encode("NO", add_special_tokens=False)[0]
-    for i, p in enumerate(pendientes, 1):
-        pieza = lista[p["cita"]]
-        texto = JUEZ.format(de_nombre=_de(pieza["nombre"]), texto=PARTE_RE.sub("", pieza["texto"]),
-                            pregunta=p["pregunta"])
-        prompt = tokenizer.apply_chat_template([{"role": "user", "content": texto}],
-                                               tokenize=False, add_generation_prompt=True)
-        entrada = tokenizer([prompt], return_tensors="pt").to("cuda")
-        with torch.no_grad():
-            logits = modelo(**entrada).logits[0, -1, [si, no]].float()
-        p["p_si"] = round(torch.softmax(logits, dim=0)[0].item(), 4)
-        p.pop("juez", None)
-        p["filtro"] = "ok"
-        print(f"  {i}/{len(pendientes)}", end="\r")
-    print()
-    aplicar_juez(preguntas)
-    guardar_y_contar(preguntas)
-
-
-def calibrar():
-    """Con las 50 preguntas calificadas a mano, cuantas buenas y malas pasan
-    con cada umbral. Corre en el portatil, despues de --juez."""
-    with open(SALIDA, encoding="utf-8") as f:
-        p_si = {p["pregunta"]: p.get("p_si") for p in json.load(f)}
-    with open(RAIZ / "data/dataset/calibracion_juez.json", encoding="utf-8") as f:
-        muestra = [(p_si[p["pregunta"]], p["buena"]) for p in json.load(f)]
-    buenas = sum(b for _, b in muestra)
-    print(f"Muestra: {buenas} buenas, {len(muestra) - buenas} malas")
-    print("umbral  buenas que pasan  malas que pasan  % malas entre las que pasan")
-    for umbral in (0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99):
-        pasan = [b for p, b in muestra if p is not None and p >= umbral]
-        malas = len(pasan) - sum(pasan)
-        print(f"  {umbral:.2f}  {sum(pasan):8d}  {malas:15d}  {malas / max(len(pasan), 1):18.0%}")
+        if p["filtro"] == "ok" and p.get("revision") == "no":
+            p["filtro"] = "revision dijo no"
 
 
 def main():
     if "--refiltrar" in sys.argv:
         refiltrar()
-        return
-    if "--juez" in sys.argv:
-        juzgar()
-        return
-    if "--calibrar" in sys.argv:
-        calibrar()
         return
     if SALIDA.exists():
         print(f"Ya existe {SALIDA}: esta revisado a mano. Borralo a proposito si quieres regenerarlo.")

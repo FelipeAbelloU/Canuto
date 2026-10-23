@@ -24,9 +24,9 @@ from src.dataset.qa_builder import (
 
 # Fija para que los numeros falsos de los negativos salgan siempre iguales.
 SEMILLA = 42
-# Fuera en la corrida 1: ~1 de cada 4 preguntas de Qwen no la responde su articulo
-# y el juez no logro separarlas (ver calibracion_juez.json).
-USAR_PREGUNTAS_QWEN = False
+# Solo entran las que aprobo la revision; en la muestra calificada a mano
+# (calibracion_juez.json) quedo 1 mala de 34.
+USAR_PREGUNTAS_QWEN = True
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
