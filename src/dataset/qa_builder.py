@@ -643,7 +643,7 @@ def generate_generales(rng, preguntas_generales: list[dict], n_absurdos: int = 1
 # \s porque las tablas traen cientos de espacios y la busqueda se vuelve eterna.
 _DATOS_PERSONALES_RE = [
     # "cedula de ciudadania N° 1.121.904.438", "C.C. 40.123.456", "1'123.512.874"
-    re.compile(r"((?:c[ée]dula(?:[ \t]+de[ \t]+ciudadan[íi]a)?|\bC\.[ \t]?C\.?)[ \t]*"
+    re.compile(r"((?:c[ée]dula(?:[ \t]*de[ \t]*ciudadan[íi]a)?|\bC\.?[ \t]?C\.?)[ \t]*"
                r"(?:No\.?|N\.?[ \t]?[°ºo]\.?|n[úu]mero)?[ \t]*:?[ \t]*)\d{1,3}(?:[.'’]?\d{3}){1,3}", re.IGNORECASE),
     # "pasaporte N° G16541406", "Pasaporte N.o GL431965", "N. º"
     re.compile(r"(pasaporte[ \t]*(?:No\.?|N\.?[ \t]?[°ºo]\.?|n[úu]mero)?[ \t]*:?[ \t]*)[A-Z]{0,3}[ \t]?\d[\dA-Z]{4,15}",
