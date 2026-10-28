@@ -205,10 +205,10 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
     return datos
 
 
-# Carpeta de train_gpu.py: t2_7b-e6-lr2e4-r16-wd0.01-do0.05-wu0.1. Dropout y warmup
-# son opcionales para leer los checkpoints viejos (t1_7b-e3-lr2e4-r16-wd0.0).
+# Carpeta de train_gpu.py: v2t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1. El v2, dropout y
+# warmup son opcionales para leer los checkpoints viejos (t1_7b-e3-lr2e4-r16-wd0.0).
 NOMBRE_RE = re.compile(
-    r"^t(\d+)_.*-e(\d+)-lr(\d)e(\d)-r(\d+)-wd([\d.]+)"
+    r"^(?:v2)?t(\d+)_.*-e(\d+)-lr(\d)e(\d)-r(\d+)-wd([\d.]+)"
     r"(?:-do([\d.]+))?(?:-wu([\d.]+))?$")
 
 

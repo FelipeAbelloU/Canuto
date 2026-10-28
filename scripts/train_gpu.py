@@ -23,7 +23,7 @@ sys.path.insert(0, str(RAIZ))
 from src.config_loader import load_config
 
 # Hiperparametros de la corrida: editar a mano antes de entrenar.
-NUM_PRUEBA = 2            # numero de prueba: prefijo de la carpeta (t1, t2, ...)
+NUM_PRUEBA = 1            # numero de prueba del dataset v2: prefijo de la carpeta (v2t1, v2t2, ...)
 EPOCAS = 4                # 4, 6, 8
 LEARNING_RATE = 2e-4      # 1e-4, 2e-4, 3e-4
 LORA_RANK = 16            # 8, 16, 32  (alpha = rank * 2, se deriva solo)
@@ -46,9 +46,9 @@ SCHEDULER = "cosine"
 LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj",
                        "gate_proj", "up_proj", "down_proj"]
 
-# Cada cuantos pasos se mide la validacion (mas chico = mas lento). Con 250, la
-# curva tiene muchos puntos y el tiempo extra fue ~11 % con el dataset viejo.
-EVAL_STEPS = 250
+# Cada cuantos pasos se mide la validacion (mas chico = mas lento). Con el
+# dataset v2 son ~5.000 pasos por epoca: 1000 da ~5 puntos por epoca.
+EVAL_STEPS = 1000
 
 # Validacion: 5 % del train (nunca del test). Semilla fija para que todas las
 # corridas validen con los mismos ejemplos.
@@ -75,13 +75,13 @@ except ImportError as exc:
 def nombre_corrida():
     """Arma el nombre de la carpeta desde los hiperparametros.
 
-    Ejemplo: t2_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
+    Ejemplo: v2t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
 
     Van los SEIS que se barren. Si faltaran el dropout y el warmup, dos corridas
     que solo difieren en uno de esos dos caerian en la misma carpeta.
     """
     lr = f"{LEARNING_RATE:.0e}".replace("e-0", "e").replace("e-", "e")
-    return (f"t{NUM_PRUEBA}_7b-e{EPOCAS}-lr{lr}-r{LORA_RANK}"
+    return (f"v2t{NUM_PRUEBA}_7b-e{EPOCAS}-lr{lr}-r{LORA_RANK}"
             f"-wd{WEIGHT_DECAY}-do{LORA_DROPOUT}-wu{WARMUP_RATIO}")
 
 
@@ -259,7 +259,9 @@ def main():
     trainer.train()
 
     if PRUEBA_RAPIDA:
-        print("\nPrueba rapida OK. Pon PRUEBA_RAPIDA = False para entrenar completo.")
+        print(f"\nVRAM maxima usada: {torch.cuda.max_memory_allocated() / 1024**3:.2f} GB "
+              f"de {total_vram:.1f} GB")
+        print("Prueba rapida OK. Pon PRUEBA_RAPIDA = False para entrenar completo.")
         return
 
     # Se guarda solo el adaptador: al servir se carga el base en 4-bit + el adaptador.
