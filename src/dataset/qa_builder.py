@@ -672,6 +672,33 @@ def enmascarar(texto: str) -> str:
     return texto
 
 
+# Basura del OCR: "se rn nit r s aion a t ano o Control Industrial". Se reconoce
+# por 4 o mas palabras cortas seguidas que no son palabras comunes. Los numeros
+# y los restos de tabla ("|") no cuentan.
+_PALABRAS_COMUNES = set("""a al de del el la las lo los en y o u e un una uno no se su sus que
+por con sin para ni es son le les me mi tu te nos ya sí si ha he han fue ser muy más mas pro
+ley art num y/o etc año mes día dia hoy cada otro otra dos tres cien mil ii iii iv vi vii viii
+ix x xi xii xiii xiv xv xx sea ver vez fin eso esa ese esta este ante bajo tras hay""".split())
+
+
+def _palabra_rara(token: str) -> bool:
+    t = token.strip(".,;:()\"'¿?¡!-–")
+    if not re.search(r"[^\W\d_]", t):        # sin letras
+        return False
+    if t.lower() in _PALABRAS_COMUNES:
+        return False
+    return len(t) <= 3
+
+
+def tiene_basura_ocr(texto: str) -> bool:
+    seguidas = 0
+    for token in texto.split():
+        seguidas = seguidas + 1 if _palabra_rara(token) else 0
+        if seguidas >= 4:
+            return True
+    return False
+
+
 def save_dataset(pairs: list[QAPair], output_path: str | Path) -> None:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

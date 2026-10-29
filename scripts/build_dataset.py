@@ -19,7 +19,7 @@ import argparse
 from src.config_loader import load_config
 from src.dataset.qa_builder import (
     generate_heuristic, generate_negatives, generate_generales,
-    cita_key, cita_completa, ultimo_articulo, save_dataset, enmascarar, QAPair
+    cita_key, cita_completa, ultimo_articulo, save_dataset, enmascarar, tiene_basura_ocr, QAPair
 )
 
 # Fija para que los numeros falsos de los negativos salgan siempre iguales.
@@ -147,6 +147,7 @@ def main():
     preguntas_negativas: set[str] = set()
     by_type: dict[str, int] = {}
     omitidos = 0
+    quitados_ocr: set[str] = set()
 
     for src_path, meta, body in docs:
         tipo = meta.get("tipo", "")
@@ -157,6 +158,12 @@ def main():
 
         key = cita_key(meta)
         pairs = generate_heuristic(body, meta, modificados.get(key))
+        # Sin los articulos con basura del OCR; los negativos se cuentan despues
+        # para que sigan 1:1.
+        for p in pairs:
+            if tiene_basura_ocr(p.answer):
+                quitados_ocr.add(p.question)
+        pairs = [p for p in pairs if p.question not in quitados_ocr]
         negs = generate_negatives(meta, indice, rng, len(pairs), preguntas_negativas)   # 1:1 por documento
 
         rel = src_path.relative_to(input_dir).as_posix()
@@ -176,10 +183,12 @@ def main():
             continue
         with open(ruta, encoding="utf-8") as f:
             abiertas = [p for p in json.load(f) if p.get("filtro", "ok") == "ok"]
-        sin_articulo = [p for p in abiertas if p["cita"] not in respuesta_de]
+        por_ocr = [p for p in abiertas if p["cita"] in quitados_ocr]
+        sin_articulo = [p for p in abiertas if p["cita"] not in respuesta_de and p["cita"] not in quitados_ocr]
         all_pairs.extend(QAPair(p["pregunta"], respuesta_de[p["cita"]], familia)
                          for p in abiertas if p["cita"] in respuesta_de)
-        print(f"Preguntas abiertas (familia {familia}): {len(abiertas) - len(sin_articulo)}")
+        print(f"Preguntas abiertas (familia {familia}): "
+              f"{len(abiertas) - len(sin_articulo) - len(por_ocr)} ({len(por_ocr)} quitadas por el OCR)")
         for p in sin_articulo:
             print(f"  OJO: no se encontro el articulo de: {p['pregunta']}")
 
@@ -228,6 +237,7 @@ def main():
         print(f"\nDocumentos omitidos por filtro de tipo: {omitidos}")
 
     print(f"\nNegativos: {n_negativos} (antes de quitar duplicados)")
+    print(f"Pares A quitados por basura del OCR: {len(quitados_ocr)}")
     print(f"Pares con datos personales enmascarados: {enmascarados}")
     print(f"Total: {len(all_pairs)} pares QA en {output_file}")
 

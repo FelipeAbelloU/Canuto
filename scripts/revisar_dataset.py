@@ -14,7 +14,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-from src.dataset.qa_builder import enmascarar
+from src.dataset.qa_builder import enmascarar, tiene_basura_ocr
 
 CARPETA = RAIZ / "data/dataset"
 
@@ -31,8 +31,6 @@ TIPOS_NEGATIVO = [
 # "No tengo informacion sobre la X No. 5 de 2018; ... Sí conozco la X No. 5 de 2016, por si..."
 SUGERENCIA_RE = re.compile(r"sobre (?:el|la) (.+?) No\. \S+ de (\d{4});.* conozco (?:el|la) (.+?) No\. \S+ de (\d{4})")
 A1_RE = re.compile(r"^¿Qué establece el artículo (\d+) (?:del|de la) (.+?)(?: de Unillanos)?(?: \(parte \d+ de \d+\))?\?$")
-PALABRA_RE = re.compile(r"\w+")
-VOCAL_RE = re.compile(r"[aeiouáéíóúüy]", re.IGNORECASE)
 
 
 def cargar(nombre):
@@ -52,20 +50,6 @@ def tipo_negativo(par):
     if par["instruction"].startswith("¿Qué dispone"):
         return "documento imposible"
     return "numero equivocado"
-
-
-def palabras_raras(texto):
-    """Palabras que el OCR suele dañar: sin vocales o con letras y numeros mezclados."""
-    raras = []
-    for p in PALABRA_RE.findall(texto):
-        if re.fullmatch(r"[ABC][12]", p):   # niveles de ingles
-            continue
-        letras = re.sub(r"[\d_]", "", p)
-        if len(p) >= 4 and len(letras) >= 3 and not VOCAL_RE.search(letras):
-            raras.append(p)
-        elif re.search(r"[a-zA-Z]\d|\d[a-zA-Z]{2,}", p) and not re.fullmatch(r"\d+(?:st|nd|rd|th|o|a)", p):
-            raras.append(p)
-    return raras
 
 
 def main():
@@ -110,22 +94,9 @@ def main():
     print(f"   preguntas de prueba que estan en train: {sum(1 for p in test if p['instruction'] in en_train)}")
     print(f"   respuestas vacias: {sum(1 for p in todo if not p['output'].strip())}")
     print(f"   cedulas/pasaportes/codigos sin tapar: {sum(1 for p in todo if enmascarar(p['output']) != p['output'])}")
+    print(f"   respuestas con basura del OCR: {sum(1 for p in todo if tiene_basura_ocr(p['output']))}")
 
     print("\n5. Sospechas (para revisar a mano, no son errores seguros)")
-    # Texto del OCR dañado: 3 o mas palabras raras y al menos 2 % de las palabras.
-    danados = []
-    for p in todo:
-        if p["familia"] == "negativo":
-            continue
-        raras = palabras_raras(p["output"])
-        total = len(PALABRA_RE.findall(p["output"]))
-        if len(raras) >= 3 and len(raras) / total >= 0.02:
-            danados.append((p, raras))
-    print(f"   respuestas con posible texto dañado por el OCR: {len(danados)} "
-          f"de {positivos} positivos ({len(danados) / positivos:.1%})")
-    for p, raras in danados[:5]:
-        print(f"      {p['instruction'][:80]}  ->  {' '.join(raras[:6])}")
-
     # Articulos citados de otra norma tomados como propios: el numero salta (1, 2, 30)
     # en un documento que modifica otro.
     articulos = defaultdict(set)
