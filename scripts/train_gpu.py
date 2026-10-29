@@ -65,6 +65,7 @@ try:
     from datasets import Dataset
     from peft import LoraConfig, prepare_model_for_kbit_training
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    from transformers.trainer_utils import get_last_checkpoint
     from trl import SFTConfig, SFTTrainer
 except ImportError as exc:
     print(f"\nFalta una dependencia: {exc}")
@@ -256,7 +257,15 @@ def main():
         compute_metrics=accuracy_tokens,
         preprocess_logits_for_metrics=quedarse_con_el_token,
     )
-    trainer.train()
+    # Si la maquina se reinicio a mitad, sigue desde el ultimo checkpoint (uno por
+    # epoca) en vez de empezar de cero. No cambiar train.json antes de retomar.
+    carpeta_checkpoints = salida / "_checkpoints"
+    ultimo = None
+    if carpeta_checkpoints.exists() and not PRUEBA_RAPIDA:
+        ultimo = get_last_checkpoint(str(carpeta_checkpoints))
+    if ultimo:
+        print(f"      retomando desde {ultimo}")
+    trainer.train(resume_from_checkpoint=ultimo)
 
     if PRUEBA_RAPIDA:
         print(f"\nVRAM maxima usada: {torch.cuda.max_memory_allocated() / 1024**3:.2f} GB "
