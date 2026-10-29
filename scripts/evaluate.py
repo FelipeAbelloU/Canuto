@@ -2,7 +2,7 @@
 
 El script hace dos cosas SEPARADAS:
 
-  1. GENERAR (lo caro, ~35 min): le pasa cada pregunta al modelo y guarda las
+  1. GENERAR (lo caro, ~45 min): le pasa cada pregunta al modelo y guarda las
      respuestas en data/eval/<nombre-del-checkpoint>.json. De paso calcula, con
      el modelo ya cargado, la perdida y la entropia de cada ejemplo.
   2. MEDIR (segundos): lee ese archivo y calcula las metricas.
@@ -28,6 +28,7 @@ Uso:
 import argparse
 import json
 import math
+import random
 import re
 import sys
 from collections import Counter
@@ -42,12 +43,16 @@ from src.factory import create_model
 
 # Fijos aqui y no en config.yaml (que comparte la web): cambiarlos rompe la
 # comparacion entre corridas.
-LIMITE_POR_DEFECTO = 150
 MAX_NEW_TOKENS = 1024
 TEMPERATURA = 0           # greedy: la misma pregunta da siempre la misma respuesta
 SEQ_LEN = 2048            # el mismo del entrenamiento
 
-MODELO_EMBEDDINGS = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+# Muestra fija del test por familia: las primeras 150 traian 1 sola B y ninguna E.
+# La E tiene 26 en el test v2: entran todas.
+MUESTRA = {"A": 60, "B": 40, "E": 26, "negativo": 60}
+SEMILLA_MUESTRA = 2026
+
+MODELO_EMBEDDINGS ="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 # Abstencion por palabras clave, no un clasificador: "no tengo datos, pero la
 # Resolucion 99 dice..." cuenta como no alucinada (decirlo en la tesis).
@@ -85,8 +90,8 @@ def parse_args():
     p.add_argument("--fuera-dominio",
                    default=str(RAIZ / "data/dataset/preguntas_fuera_dominio.json"))
     p.add_argument("--config", default=str(RAIZ / "config/config.yaml"))
-    p.add_argument("--limit", type=int, default=LIMITE_POR_DEFECTO,
-                   help="Cuantas preguntas de test.json evaluar (0 = todas)")
+    p.add_argument("--limit", type=int, default=None,
+                   help="Solo las primeras N de la muestra, para probar el script")
     p.add_argument("--regenerar", action="store_true",
                    help="Vuelve a generar las respuestas aunque ya existan")
     return p.parse_args()
@@ -140,6 +145,15 @@ def guardar(ruta, datos):
         json.dump(datos, f, ensure_ascii=False, indent=2)
 
 
+def muestra_por_familia(test):
+    rng = random.Random(SEMILLA_MUESTRA)
+    elegidas = []
+    for familia, cuantas in MUESTRA.items():
+        de_la_familia = [r for r in test if r.get("familia") == familia]
+        elegidas += rng.sample(de_la_familia, min(cuantas, len(de_la_familia)))
+    return elegidas
+
+
 def generar(ruta_salida, checkpoint, config, test, fuera, limite):
     """Genera las respuestas del modelo y las guarda en un JSON."""
     modelo = create_model(config, checkpoint=checkpoint)
@@ -156,7 +170,7 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
     for i, r in enumerate(test, 1):
         respuesta = modelo.chat([{"role": "user", "content": r["instruction"]}])
         casos.append({"pregunta": r["instruction"], "referencia": r["output"],
-                      "respuesta": respuesta})
+                      "familia": r.get("familia"), "respuesta": respuesta})
         print(f"  {i}/{len(test)}", end="\r")
     print()
 
@@ -173,7 +187,8 @@ def generar(ruta_salida, checkpoint, config, test, fuera, limite):
         "checkpoint": Path(modelo.checkpoint_path).name,
         "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "n_test": len(casos),
-        "limit": limite,   # lo que se pidio, que puede ser mas de lo que hay en test.json
+        "limit": limite,
+        "muestra": MUESTRA,
         "max_new_tokens": MAX_NEW_TOKENS,
         "temperatura": TEMPERATURA,
         "casos": casos,
@@ -326,6 +341,23 @@ def tasa_abstencion(casos_fuera):
     """El complemento de la tasa de alucinacion: cuantas veces reconoce que no
     sabe. Es una de las dos accuracies reales del proyecto."""
     return round(1 - tasa_alucinacion(casos_fuera), 4)
+
+
+def por_familia(casos):
+    """Exactitud de citas y cuantas veces dice que no sabe, por familia. En los
+    negativos lo bueno es que diga que no sabe; en A, B y E, que no lo diga."""
+    resultado = {}
+    for familia in MUESTRA:
+        grupo = [c for c in casos if c.get("familia") == familia]
+        if not grupo:
+            continue
+        no_sabe = sum(1 for c in grupo if reconoce_no_saber(c["respuesta"]))
+        resultado[familia] = {
+            "n": len(grupo),
+            "exactitud_citas": None if familia == "negativo" else round(exactitud_citas(grupo), 4),
+            "dice_no_saber": round(no_sabe / len(grupo), 4),
+        }
+    return resultado
 
 
 def repeticion_ngramas(texto, n=4):
@@ -579,6 +611,10 @@ def main():
                   f"pidiendo {args.limit}.")
             print("Corre con --regenerar (o borralo) para no mezclar corridas.")
             sys.exit(1)
+        if datos.get("muestra") != MUESTRA:
+            print(f"\nOJO: ese archivo se genero con otra muestra ({datos.get('muestra')}).")
+            print("Corre con --regenerar para no mezclar corridas.")
+            sys.exit(1)
         # Un archivo viejo con otras preguntas fuera de dominio no es comparable.
         with open(args.fuera_dominio, encoding="utf-8") as f:
             n_fuera_ahora = len(json.load(f))
@@ -597,7 +633,7 @@ def main():
             sys.exit(1)
     else:
         with open(args.test, encoding="utf-8") as f:
-            test = json.load(f)
+            test = muestra_por_familia(json.load(f))
         if args.limit:
             test = test[:args.limit]
         with open(args.fuera_dominio, encoding="utf-8") as f:
@@ -630,6 +666,12 @@ def main():
     print("\n=== Alucinacion por tipo de pregunta ===")
     for bloque, tasa in alucinacion_por_bloque(datos["fuera_dominio"]).items():
         print(f"  {bloque:<24} {tasa}")
+
+    resultados["por_familia"] = por_familia(datos["casos"])
+    print("\n=== Por familia del test (dice_no_saber: alto en negativos, bajo en el resto) ===")
+    for familia, valores in resultados["por_familia"].items():
+        print(f"  {familia:<10} n={valores['n']:<4} exactitud_citas={valores['exactitud_citas']}"
+              f"  dice_no_saber={valores['dice_no_saber']}")
 
     # Solo en los archivos de t1 y t2: se revisan a ojo.
     control = [c for c in datos["fuera_dominio"]
