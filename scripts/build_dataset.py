@@ -158,8 +158,7 @@ def main():
 
         key = cita_key(meta)
         pairs = generate_heuristic(body, meta, modificados.get(key))
-        # Sin los articulos con basura del OCR; los negativos se cuentan despues
-        # para que sigan 1:1.
+        # Se quitan antes de contar los negativos para que sigan 1:1.
         for p in pairs:
             if tiene_basura_ocr(p.answer):
                 quitados_ocr.add(p.question)

@@ -42,11 +42,9 @@ def tipo_negativo(par):
     for nombre, frase in TIPOS_NEGATIVO:
         if frase in par["output"]:
             return nombre
-    # Con sugerencia: mismo tipo y otro año, o el mismo numero y año con otro tipo
     m = SUGERENCIA_RE.search(par["output"])
     if m:
         return "año equivocado" if m.group(2) != m.group(4) else "tipo equivocado"
-    # Sin sugerencia: otro numero o un documento imposible
     if par["instruction"].startswith("¿Qué dispone"):
         return "documento imposible"
     return "numero equivocado"

@@ -479,8 +479,7 @@ def generate_negatives(meta: dict, indice: dict, rng, cuantos: int, vistas: set)
     key = cita_key(meta)
     numero, anio = meta.get("numero", ""), meta.get("anio", "")
     ultimo = indice.get(key, 0)
-    # El documento con otro numero, año o tipo puede existir aunque no este en el
-    # corpus (hay pocas resoluciones rectorales por año): no culpar al usuario.
+    # Puede existir aunque no este en el corpus: no culpar al usuario.
     no_esta = "no está entre los documentos que conozco."
     esa = "ese" if la == "el" else "esa"
 
@@ -672,9 +671,7 @@ def enmascarar(texto: str) -> str:
     return texto
 
 
-# Basura del OCR: "se rn nit r s aion a t ano o Control Industrial". Se reconoce
-# por 4 o mas palabras cortas seguidas que no son palabras comunes. Los numeros
-# y los restos de tabla ("|") no cuentan.
+# Basura del OCR: 4 o mas palabras cortas seguidas, como "se rn nit r s aion a t".
 _PALABRAS_COMUNES = set("""a al de del el la las lo los en y o u e un una uno no se su sus que
 por con sin para ni es son le les me mi tu te nos ya sí si ha he han fue ser muy más mas pro
 ley art num y/o etc año mes día dia hoy cada otro otra dos tres cien mil ii iii iv vi vii viii

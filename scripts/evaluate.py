@@ -92,7 +92,7 @@ def parse_args():
     return p.parse_args()
 
 
-# Paso 1: generar las respuestas (necesita el modelo).
+# Generar las respuestas (necesita el modelo).
 def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device, system_prompt):
     """Un forward pass sobre (pregunta + respuesta de referencia), en el MISMO
     formato con el que entrena train_gpu.py (system prompt + user/assistant).
@@ -260,7 +260,7 @@ def hiperparametros(carpeta):
     return datos
 
 
-# Paso 2: metricas (solo texto, sin el modelo).
+# Metricas (solo texto, sin el modelo).
 def citas(texto):
     """Conjunto de citas (numero, anio) que aparecen en un texto.
 

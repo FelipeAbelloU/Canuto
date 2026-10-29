@@ -177,7 +177,7 @@ def main():
         output_file = out_subdir / (pdf_path.stem + ".md")
 
         try:
-            # Etapa 1: PDF -> texto crudo (solo si todavia no existe).
+            # El crudo se extrae una sola vez; el .md se rehace siempre.
             if raw_file.exists():
                 datos = json.loads(raw_file.read_text(encoding="utf-8"))
                 text, method, pages = datos["texto"], datos["metodo"], datos["paginas"]
@@ -196,7 +196,6 @@ def main():
                 text, pages = doc.text, doc.pages
                 kind = "digital" if method != "docling" else "ocr"
 
-            # Etapa 2: texto crudo -> .md (se rehace siempre).
             md = to_markdown(text, meta, method=method, pages=pages)
             out_subdir.mkdir(parents=True, exist_ok=True)
             output_file.write_text(md, encoding="utf-8")

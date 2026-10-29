@@ -257,16 +257,14 @@ def main():
         compute_metrics=accuracy_tokens,
         preprocess_logits_for_metrics=quedarse_con_el_token,
     )
-    # Si la maquina se reinicio a mitad, sigue desde el ultimo checkpoint (uno por
-    # epoca) en vez de empezar de cero. No cambiar train.json antes de retomar.
+    # Si la maquina se reinicio, sigue desde el ultimo checkpoint (no cambiar train.json).
     carpeta_checkpoints = salida / "_checkpoints"
     ultimo = None
     if carpeta_checkpoints.exists() and not PRUEBA_RAPIDA:
         ultimo = get_last_checkpoint(str(carpeta_checkpoints))
     if ultimo:
         print(f"      retomando desde {ultimo}")
-        # torch 2.6+ no deja leer rng_state.pth (trae arreglos de numpy) con la
-        # version de transformers que usamos; el archivo lo guardamos nosotros.
+        # Sin esto torch 2.6+ no abre el rng_state.pth que guarda transformers 4.46.
         import numpy as np
         torch.serialization.add_safe_globals([
             np._core.multiarray._reconstruct, np.ndarray, np.dtype,

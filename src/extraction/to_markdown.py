@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-# Nombre legible de cada carpeta de tipo.
 TYPE_LABELS = {
     "ACTA_CONSEJO_ACADEMICO": "Acta del Consejo Académico",
     "ACTA_CONSEJO_SUPERIOR": "Acta del Consejo Superior",
@@ -120,10 +119,8 @@ _SECTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# "ARTICULO PRIMERO", "ARTICULO 8.", "ARTICULO 8°", "ART. 12"
-# Tambien lo que deja el OCR: "ARTICULO2°." (numero pegado) y "ARTÍCULO. 65°" (punto de mas,
-# asi esta el art. 65 del Reglamento Estudiantil). Pegado solo se acepta si sigue un digito,
-# para no tomar "ARTICULOS" como un articulo "S".
+# "ARTICULO 8°", "ART. 12", y del OCR "ARTICULO2°." y "ARTÍCULO. 65°". Pegado solo
+# si sigue un digito, para no tomar "ARTICULOS" como un articulo "S".
 _ARTICULO_RE = re.compile(
     r"^(ART[IÍ]CULO|ART\.)(?:\.?\s+|(?=\d))([A-Za-zÁÉÍÓÚÑ0-9°º]+)\s*[.:\-–)]*\s*(.*)$",
     re.IGNORECASE,
@@ -142,9 +139,8 @@ _PARAGRAFO_RE = re.compile(
 # Ruido de pie/encabezado de pagina: "Pagina 1 de 2", "Pag. 3"
 _PAGE_NOISE_RE = re.compile(r"^P[áa]g(?:ina|\.)?\s*\d+\s*(?:de\s*\d+)?$", re.IGNORECASE)
 
-# Banner institucional repetido en cada hoja (se descarta: el titulo canonico ya
-# viene del frontmatter/metadata). Anclado al INICIO de linea para no borrar texto
-# de cuerpo que mencione "Universidad de los Llanos" (p.ej. dentro de un articulo).
+# Banner repetido en cada hoja. Anclado al inicio de linea para no borrar un
+# articulo que mencione "Universidad de los Llanos".
 _BANNER_RE = re.compile(
     r"^UNIVERSIDAD\s+DE\s+LOS\s+LLANOS\b.*(RESOLUCI[ÓO]N|ACUERDO|DECRETO|CONSEJO)"
     r"|^(RESOLUCI[ÓO]N|ACUERDO|DECRETO)\s.{0,75}\bNo?[°º.]?\s*\d+.{0,20}\bDE\s+(19|20)\d{2}\b\)?\.?\s*(\(.*\))?$",
@@ -283,7 +279,6 @@ def _normalize_markdown(md: str) -> str:
             out_lines.append("")
             continue
 
-        # Ruido a descartar siempre.
         if (_PAGE_NOISE_RE.match(s) or _DATE_LINE_RE.match(s)
                 or _BANNER_RE.search(s) or _FOOTER_RE.search(s) or _HOJA_RE.match(s)
                 or (s[:10].isupper() and _MEMBRETE_RE.match(s))
@@ -337,9 +332,8 @@ def _normalize_markdown(md: str) -> str:
     return md_out.strip()
 
 
-# Encabezado impreso del documento: "ACUERDO SUPERIOR No. 016 DE 2020". Se busca en la linea
-# SIN espacios (el OCR escribe "A C U E R D O  S U P E R I O R"); puede venir despues del
-# membrete "UNIVERSIDAD DE LOS LLANOS CONSEJO ACADEMICO".
+# Encabezado impreso: "ACUERDO SUPERIOR No. 016 DE 2020". Se busca sin espacios porque
+# el OCR escribe "A C U E R D O  S U P E R I O R".
 _IMPRESO_RE = re.compile(
     r"^(?:UNIVERSIDADDELOSLLA[NÑ]OS)?(?:CONSEJO(?:ACAD[EÉ]MICO|SUPERIOR(?:UNIVERSITARIO)?))?"
     r"(ACUERDO|RESOLUCI[OÓ]N|DECRETO|LEY)[A-ZÁÉÍÓÚÑ\-]{0,40}?N(?:O|Ú?MERO)?[°º.:]*0*(\d{1,4})DE((?:19|20)\d{2})"
