@@ -265,6 +265,13 @@ def main():
         ultimo = get_last_checkpoint(str(carpeta_checkpoints))
     if ultimo:
         print(f"      retomando desde {ultimo}")
+        # torch 2.6+ no deja leer rng_state.pth (trae arreglos de numpy) con la
+        # version de transformers que usamos; el archivo lo guardamos nosotros.
+        import numpy as np
+        torch.serialization.add_safe_globals([
+            np._core.multiarray._reconstruct, np.ndarray, np.dtype,
+            type(np.dtype(np.uint32)),
+        ])
     trainer.train(resume_from_checkpoint=ultimo)
 
     if PRUEBA_RAPIDA:
