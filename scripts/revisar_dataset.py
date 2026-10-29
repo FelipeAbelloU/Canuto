@@ -22,14 +22,14 @@ CARPETA = RAIZ / "data/dataset"
 # generate_generales en qa_builder.py).
 TIPOS_NEGATIVO = [
     ("articulo que no existe", "ese artículo no exista"),
-    ("año equivocado", "el año no coincida"),
-    ("tipo equivocado", "Tal vez te refieres"),
     ("otra universidad", "Solo conozco la normativa de la Universidad de los Llanos."),
     ("dato fuera de la normativa", "consultar directamente con la dependencia"),
     ("datos privados", "datos privados o de seguridad"),
     ("cultura general", "solo respondo sobre la normativa"),
 ]
 
+# "No tengo informacion sobre la X No. 5 de 2018; ... Sí conozco la X No. 5 de 2016, por si..."
+SUGERENCIA_RE = re.compile(r"sobre (?:el|la) (.+?) No\. \S+ de (\d{4});.* conozco (?:el|la) (.+?) No\. \S+ de (\d{4})")
 A1_RE = re.compile(r"^¿Qué establece el artículo (\d+) (?:del|de la) (.+?)(?: de Unillanos)?(?: \(parte \d+ de \d+\))?\?$")
 PALABRA_RE = re.compile(r"\w+")
 VOCAL_RE = re.compile(r"[aeiouáéíóúüy]", re.IGNORECASE)
@@ -44,7 +44,11 @@ def tipo_negativo(par):
     for nombre, frase in TIPOS_NEGATIVO:
         if frase in par["output"]:
             return nombre
-    # "Te sugiero verificar el numero y el año": otro numero o un documento imposible
+    # Con sugerencia: mismo tipo y otro año, o el mismo numero y año con otro tipo
+    m = SUGERENCIA_RE.search(par["output"])
+    if m:
+        return "año equivocado" if m.group(2) != m.group(4) else "tipo equivocado"
+    # Sin sugerencia: otro numero o un documento imposible
     if par["instruction"].startswith("¿Qué dispone"):
         return "documento imposible"
     return "numero equivocado"

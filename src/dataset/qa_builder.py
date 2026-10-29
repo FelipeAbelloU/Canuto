@@ -466,9 +466,9 @@ _TIPOS_CONFUNDIBLES = {
 
 
 def generate_negatives(meta: dict, indice: dict, rng, cuantos: int, vistas: set) -> list[QAPair]:
-    """Hasta `cuantos` preguntas sobre algo que no existe: un articulo despues del
-    ultimo, el documento con otro año, otro numero u otro tipo. `indice` (todo el
-    corpus) confirma que no existe; `vistas` (compartido entre documentos) evita
+    """Hasta `cuantos` preguntas sobre algo que no esta en el corpus: un articulo
+    despues del ultimo, el documento con otro año, otro numero u otro tipo. `indice`
+    (todo el corpus) confirma que no esta; `vistas` (compartido entre documentos) evita
     repetir una pregunta que otro documento ya invento."""
     if _skip_type(meta.get("tipo", "")):
         return []
@@ -479,6 +479,10 @@ def generate_negatives(meta: dict, indice: dict, rng, cuantos: int, vistas: set)
     key = cita_key(meta)
     numero, anio = meta.get("numero", ""), meta.get("anio", "")
     ultimo = indice.get(key, 0)
+    # El documento con otro numero, año o tipo puede existir aunque no este en el
+    # corpus (hay pocas resoluciones rectorales por año): no culpar al usuario.
+    no_esta = "no está entre los documentos que conozco."
+    esa = "ese" if la == "el" else "esa"
 
     def articulo():
         n = ultimo + rng.randint(1, max(80, ultimo))
@@ -491,16 +495,15 @@ def generate_negatives(meta: dict, indice: dict, rng, cuantos: int, vistas: set)
         if (key[0], key[1], str(otro)) in indice:
             return None
         return (f"{la} {tipo} No. {numero} de {otro}",
-                f"No tengo información sobre {la} {tipo} No. {numero} de {otro}. Conozco {la} {cita}, "
-                f"así que es posible que el año no coincida; te sugiero verificarlo.")
+                f"No tengo información sobre {la} {tipo} No. {numero} de {otro}; {no_esta} "
+                f"Sí conozco {la} {cita}, por si te refieres a {esa}.")
 
     def otro_numero():
         otro = int(numero) + rng.randint(1, 60)
         if (key[0], str(otro), anio) in indice:
             return None
         return (f"{la} {tipo} No. {otro} de {anio}",
-                f"No tengo información sobre {la} {tipo} No. {otro} de {anio}. "
-                f"Te sugiero verificar el número y el año del documento.")
+                f"No tengo información sobre {la} {tipo} No. {otro} de {anio}; {no_esta}")
 
     def otro_tipo():
         codigo = rng.choice([c for c in _TIPOS_CONFUNDIBLES if c != key[0]])
@@ -508,10 +511,9 @@ def generate_negatives(meta: dict, indice: dict, rng, cuantos: int, vistas: set)
             return None
         nombre = _TIPOS_CONFUNDIBLES[codigo]
         la_otro = _gender(nombre)[0]
-        al = "al" if la == "el" else "a la"
         return (f"{la_otro} {nombre} No. {numero} de {anio}",
-                f"No tengo información sobre {la_otro} {nombre} No. {numero} de {anio}. "
-                f"Tal vez te refieres {al} {cita}.")
+                f"No tengo información sobre {la_otro} {nombre} No. {numero} de {anio}; {no_esta} "
+                f"Sí conozco {la} {cita}, por si te refieres a {esa}.")
 
     generadores = [articulo] if ultimo else []
     if numero.isdigit() and anio.isdigit():
