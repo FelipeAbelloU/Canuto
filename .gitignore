@@ -28,6 +28,10 @@ data/eval/
 # Cola de OCR para la workstation (se regenera al correr extract_text.py)
 data/_ocr_queue.txt
 
+# Excel exportado de SIRIUS (datos institucionales, se pasa a mano) y lista de lo que bajo descargar_sirius.py
+data/sirius/
+data/_sirius_nuevos.txt
+
 # Lista de numeros impresos distintos al nombre del archivo (salida de revisar_numeros.py)
 data/numeros_por_revisar.tsv
 

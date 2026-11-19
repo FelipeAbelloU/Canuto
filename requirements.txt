@@ -15,6 +15,9 @@ PyMuPDF==1.28.0
 # --- Configuracion ---
 PyYAML==6.0.3
 
+# --- Excel de SIRIUS (scripts/descargar_sirius.py) ---
+openpyxl==3.1.5
+
 # --- Modelo de lenguaje ---
 transformers==4.46.3
 tokenizers==0.20.3
