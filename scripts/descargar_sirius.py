@@ -51,7 +51,7 @@ def leer_excel(ruta):
 
 def ruta_local(fila):
     rel = fila["archivo_soporte"]
-    # en sirius hay rutas sin un año valido (217/.../8_217.pdf); se guardan con el del excel
+    # en sirius hay rutas sin un año valido (217/.../8_217.pdf); el pdf esta en la ruta con el año del excel
     if len(rel.split("/")[0]) != 4:
         carpeta = rel.split("/")[3]
         rel = f"{fila['year']}/si/normatividad/{carpeta}/{fila['numero']}_{fila['year']}.pdf"
@@ -112,7 +112,7 @@ def main():
         rel_vieja = rel.replace(f"/{carpeta}/", f"/{CARPETA_VIEJA.get(carpeta, carpeta)}/")
         local = locales.get(rel.lower()) or locales.get(rel_vieja.lower())
         if local is None:
-            nuevos.append((fila["archivo_soporte"], pdf_dir / rel))
+            nuevos.append((rel, pdf_dir / rel))
         elif not completo(local):
             cortados.append((fila["archivo_soporte"], local))
 
