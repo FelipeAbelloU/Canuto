@@ -23,7 +23,8 @@ sys.path.insert(0, str(RAIZ))
 from src.config_loader import load_config
 
 # Hiperparametros de la corrida: editar a mano antes de entrenar.
-NUM_PRUEBA = 1            # numero de prueba del dataset v2: prefijo de la carpeta (v2t1, v2t2, ...)
+DATASET = "v3"            # version del dataset: prefijo de la carpeta (v3t1, v3t2, ...)
+NUM_PRUEBA = 1            # numero de prueba dentro de ese dataset
 EPOCAS = 4                # 4, 6, 8
 LEARNING_RATE = 2e-4      # 1e-4, 2e-4, 3e-4
 LORA_RANK = 16            # 8, 16, 32  (alpha = rank * 2, se deriva solo)
@@ -76,13 +77,13 @@ except ImportError as exc:
 def nombre_corrida():
     """Arma el nombre de la carpeta desde los hiperparametros.
 
-    Ejemplo: v2t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
+    Ejemplo: v3t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
 
     Van los SEIS que se barren. Si faltaran el dropout y el warmup, dos corridas
     que solo difieren en uno de esos dos caerian en la misma carpeta.
     """
     lr = f"{LEARNING_RATE:.0e}".replace("e-0", "e").replace("e-", "e")
-    return (f"v2t{NUM_PRUEBA}_7b-e{EPOCAS}-lr{lr}-r{LORA_RANK}"
+    return (f"{DATASET}t{NUM_PRUEBA}_7b-e{EPOCAS}-lr{lr}-r{LORA_RANK}"
             f"-wd{WEIGHT_DECAY}-do{LORA_DROPOUT}-wu{WARMUP_RATIO}")
 
 
@@ -286,6 +287,7 @@ def main():
     # PEFT solo guarda los de LoRA; epocas, learning rate y demas quedan aqui
     # (los lee evaluate.py para la fila del Excel).
     hiperparametros = {
+        "dataset": DATASET,
         "num_prueba": NUM_PRUEBA,
         "nombre": nombre,
         "epocas": EPOCAS,
