@@ -28,9 +28,8 @@ PDF/  ->  data/extracted/*.md  ->  dataset_alpaca.json  ->  train/test  ->  adap
    informacion...", para que el modelo aprenda a reconocer lo que no sabe.
 3. **Entrenamiento**: fine-tuning con QLoRA (el modelo base se carga en 4 bits y solo
    se entrena el adaptador).
-4. **Evaluacion**: el 30 % de prueba se separa por redaccion: cada articulo de la
-   prueba tiene otra redaccion en entrenamiento. Se suma un conjunto de preguntas
-   fuera de dominio para medir la alucinacion.
+4. **Evaluacion**: el 20 % de los pares se aparta al azar para la prueba (semilla 42).
+   Se suma un conjunto de preguntas fuera de dominio para medir la alucinacion.
 5. **Uso**: la interfaz web en Django carga el modelo base mas el adaptador entrenado.
 
 ## Instalacion
@@ -54,7 +53,7 @@ python scripts/extract_text.py            # PDFs digitales a Markdown
 python scripts/extract_text.py --ocr      # escaneados (usar el venv de docling)
 python scripts/extract_text.py --solo-md  # rehace los .md desde data/raw/ sin repetir el OCR
 python scripts/build_dataset.py           # pares pregunta-respuesta
-python scripts/split_dataset.py           # division 70/30
+python scripts/split_dataset.py           # division 80/20
 python scripts/train_gpu.py               # entrenamiento QLoRA
 
 python scripts/chat_cli.py                # probar el modelo por terminal
