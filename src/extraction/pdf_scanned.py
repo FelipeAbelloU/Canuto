@@ -1,13 +1,5 @@
-"""Extrae texto de PDFs escaneados (imagenes) usando OCR con docling.
-
-docling hace el OCR y ademas reconoce tablas, y entrega el resultado ya en Markdown.
-Necesita GPU para ser practico a gran escala y un ENTORNO VIRTUAL APARTE, porque sus
-dependencias chocan con las del stack de entrenamiento/inferencia. Ver
-``requirements-docling.txt``.
-
-El import de docling es diferido: importar este modulo no falla en la laptop sin
-docling; solo falla si se llama a ``extract()`` sin docling instalado.
-"""
+"""OCR de PDF escaneados con docling, que tambien reconoce tablas y entrega Markdown.
+Va en un venv aparte (requirements-docling.txt) porque sus dependencias chocan con las del entrenamiento."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,7 +22,7 @@ def extract(pdf_path: str | Path) -> ExtractedDocument:
     """Convierte un PDF escaneado a Markdown usando el OCR de docling."""
     path = Path(pdf_path)
 
-    # Import diferido: docling solo se necesita en la maquina que corre el OCR.
+    # se importa aqui para que el modulo cargue en el portatil sin docling
     try:
         from docling.document_converter import DocumentConverter
     except ImportError:
