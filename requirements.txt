@@ -30,19 +30,16 @@ numpy==2.4.6
 peft==0.19.1
 trl==0.12.2
 datasets==4.8.5
-bitsandbytes   # cuantizacion 4-bit para que el 7B quepa en la GPU de 16 GB
+bitsandbytes==0.49.2   # cuantizacion 4-bit para que el 7B quepa en la GPU de 16 GB
 
 # --- Seguimiento del entrenamiento ---
-wandb   # curvas de perdida por epoca (train/loss vs eval/loss)
+wandb==0.30.0   # curvas de perdida por epoca (train/loss vs eval/loss)
 
 # --- Metricas de evaluacion (scripts/evaluate.py) ---
-# Van sin version fija; transformers si esta fijado arriba, asi que pip respeta
-# el 4.46.3 que necesita trl. Despues de instalar, verificar con:
-#   pip show transformers   ->  debe seguir en 4.46.3
-bert-score
-rouge-score
-sacrebleu
-sentence-transformers
+bert-score==0.3.13
+rouge-score==0.1.2
+sacrebleu==2.4.3
+sentence-transformers==5.5.1
 
 # --- Interfaz web ---
 Django==5.2.15
