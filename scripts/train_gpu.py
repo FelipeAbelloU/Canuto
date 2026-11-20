@@ -34,8 +34,7 @@ WARMUP_RATIO = 0.1        # 0.03, 0.1, 0.2    (5-10% de los pasos es lo usual)
 
 # Barrido: mover una sola perilla por corrida, en este orden de prioridad:
 #   epocas > learning rate > weight decay > lora_dropout > rank > warmup_ratio
-# Mas de 3 epocas: en la corrida 1 la validacion seguia bajando en la tercera y
-# no se vio donde empieza el sobreajuste. Weight decay 0 seria sin regularizacion.
+# mas de 3 epocas porque en la corrida 1 la validacion seguia bajando en la tercera
 
 # Fijos: cambiarlos rompe la comparacion entre corridas.
 MODELO_BASE = "Qwen/Qwen2.5-7B-Instruct"
@@ -75,42 +74,21 @@ except ImportError as exc:
 
 
 def nombre_corrida():
-    """Arma el nombre de la carpeta desde los hiperparametros.
-
-    Ejemplo: v3t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
-
-    Van los SEIS que se barren. Si faltaran el dropout y el warmup, dos corridas
-    que solo difieren en uno de esos dos caerian en la misma carpeta.
-    """
+    """Ejemplo: v3t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1.
+    Van los seis que se barren para que dos corridas no caigan en la misma carpeta."""
     lr = f"{LEARNING_RATE:.0e}".replace("e-0", "e").replace("e-", "e")
     return (f"{DATASET}t{NUM_PRUEBA}_7b-e{EPOCAS}-lr{lr}-r{LORA_RANK}"
             f"-wd{WEIGHT_DECAY}-do{LORA_DROPOUT}-wu{WARMUP_RATIO}")
 
 
 def quedarse_con_el_token(logits, labels):
-    """Se queda solo con el token mas probable de cada posicion.
-
-    Hace falta para poder calcular el accuracy sin quedarse sin RAM: el modelo
-    saca un numero por cada una de las 152.000 palabras del vocabulario y por
-    cada token de los 474 ejemplos de validacion. Guardar todo eso son decenas
-    de GB. Con quedarse con el ganador (argmax) basta para contar aciertos.
-    """
+    """Solo el token mas probable: guardar los logits de todo el vocabulario no cabe en RAM."""
     return logits.argmax(dim=-1)
 
 
 def accuracy_tokens(evaluacion):
-    """Que fraccion de los tokens de validacion acierta el modelo.
-
-    Es la curva de "accuracy" que hacia falta para acompanar a la de perdida.
-    Se saca del paso de validacion que ya se hace, sin generar texto.
-
-    OJO, y hay que decirlo asi en el documento: este numero esta INFLADO. Los
-    pares de preguntas y respuestas salen de plantillas, asi que buena parte de
-    los tokens son formulas repetidas y faciles de acertar; ademas aqui cuentan
-    tambien los tokens de la pregunta, no solo los de la respuesta. Sirve como
-    curva de diagnostico (si se dispara, esta memorizando), NO para elegir cual
-    corrida gana. Para eso estan la exactitud de citas y la tasa de abstencion.
-    """
+    """Accuracy por token en la validacion. Inflado: cuenta tambien la pregunta y las
+    plantillas repetidas; sirve para ver si memoriza, no para elegir la corrida ganadora."""
     predicciones, etiquetas = evaluacion
     # Lo predicho en t se compara con el token real de t+1.
     predicciones = predicciones[:, :-1]
@@ -122,10 +100,7 @@ def accuracy_tokens(evaluacion):
 
 
 def cargar_textos(path, tokenizer, system_prompt):
-    """Pasa los pares {instruction, output} al formato de chat de Qwen2.5.
-
-    Con el system prompt de config.yaml, el mismo que usan el chat y evaluate.py.
-    """
+    """Pares al formato de chat de Qwen con el system prompt de config.yaml, igual que el chat y evaluate.py."""
     with open(path, encoding="utf-8") as f:
         records = json.load(f)
     textos = []
@@ -198,7 +173,6 @@ def main():
     )
     model = prepare_model_for_kbit_training(model)
 
-    # Deja en el log en que dispositivos quedaron los pesos.
     dispositivos = {str(p.device) for p in model.parameters()}
     print(f"      parametros en: {sorted(dispositivos)}")
     print(f"      VRAM ocupada tras cargar: "
