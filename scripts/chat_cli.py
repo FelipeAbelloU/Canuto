@@ -3,7 +3,7 @@
 Uso:
     python scripts/chat_cli.py
 
-Dentro del chat: "salir" termina y "reset" empieza una conversacion nueva.
+Dentro del chat: "salir" termina.
 """
 import sys
 from pathlib import Path
@@ -25,7 +25,7 @@ def main():
     pipeline = create_pipeline(args.config)
 
     print(f"  Modelo: {pipeline.model_name}")
-    print("  Escribe 'salir' para terminar, 'reset' para nueva conversación.\n")
+    print("  Escribe 'salir' para terminar.\n")
 
     while True:
         try:
@@ -39,10 +39,6 @@ def main():
         if question.lower() == "salir":
             print("Hasta luego.")
             break
-        if question.lower() == "reset":
-            pipeline.reset_history()
-            print("Conversación reiniciada.\n")
-            continue
 
         result = pipeline.query(question)
         print(f"\nAsistente: {result['answer']}\n")

@@ -58,8 +58,7 @@ def api_query(request):
         if not pregunta:
             return JsonResponse({"error": "Pregunta vacía."}, status=400)
 
-        # Sin historial: un pipeline nuevo por pregunta.
-        respuesta = ChatPipeline(_get_modelo(), max_history=0).query(pregunta)
+        respuesta = ChatPipeline(_get_modelo()).query(pregunta)
         return JsonResponse({"answer": respuesta["answer"]})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

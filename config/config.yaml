@@ -30,8 +30,3 @@ extraction:
 dataset:
   input_dir: "data/extracted"
   output_dir: "data/dataset"
-
-# Turnos anteriores que recibe el modelo en el chat por terminal. En 0 porque se
-# entrena con una pregunta a la vez.
-chat:
-  max_history: 0

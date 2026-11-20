@@ -27,6 +27,4 @@ def create_model(config: dict, checkpoint: str = None):
 
 def create_pipeline(config_path: str = "config/config.yaml") -> ChatPipeline:
     """Crea un pipeline de chat listo para responder preguntas."""
-    config = load_config(config_path)
-    max_history = config.get("chat", {}).get("max_history", 5)
-    return ChatPipeline(create_model(config), max_history)
+    return ChatPipeline(create_model(load_config(config_path)))
