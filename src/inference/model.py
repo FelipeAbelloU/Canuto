@@ -33,8 +33,7 @@ class FineTunedModel:
         dtype = torch.bfloat16 if self.device != "cpu" else torch.float32
 
         if (ckpt / "adapter_config.json").exists():
-            # Es un adaptador LoRA: se carga el modelo base y encima el adaptador.
-            # En GPU el base va en 4-bit para que el 7B quepa en los 16 GB.
+            # en GPU el base va en 4-bit para que el 7B quepa en los 16 GB
             import json
             from peft import PeftModel
             base_name = json.loads((ckpt / "adapter_config.json").read_text())["base_model_name_or_path"]
@@ -60,7 +59,6 @@ class FineTunedModel:
             self._model = PeftModel.from_pretrained(base, str(ckpt))
             self._tokenizer = AutoTokenizer.from_pretrained(str(ckpt), trust_remote_code=True)
         else:
-            # Es un modelo completo: se carga directo.
             self._tokenizer = AutoTokenizer.from_pretrained(str(ckpt), trust_remote_code=True)
             self._model = AutoModelForCausalLM.from_pretrained(
                 str(ckpt),
@@ -76,7 +74,6 @@ class FineTunedModel:
         print("  Modelo listo.")
 
     def is_available(self) -> bool:
-        """Indica si el checkpoint existe en disco."""
         return bool(self.checkpoint_path and Path(self.checkpoint_path).exists())
 
     @property

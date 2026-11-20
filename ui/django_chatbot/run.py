@@ -9,13 +9,12 @@ import sys
 import argparse
 from pathlib import Path
 
-# Agrega la raiz del proyecto al path para que Django encuentre src.*
+# para que Django encuentre src.*
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "chatbot.settings")
 
-# Cambia al directorio del proyecto Django
 os.chdir(Path(__file__).parent)
 
 
