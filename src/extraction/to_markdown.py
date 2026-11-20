@@ -61,10 +61,7 @@ class DocMeta:
 
 
 def parse_meta_from_path(pdf_path: Path, corpus_root: Path) -> DocMeta:
-    """Deriva DocMeta de la ruta ``<año>/si/normatividad/<TIPO>/<n>_<año>.pdf``.
-
-    Es tolerante: si la estructura no calza exactamente, rellena lo que pueda.
-    """
+    """Saca tipo, año y numero de la ruta <año>/si/normatividad/<TIPO>/<n>_<año>.pdf; si no calza, rellena lo que pueda."""
     pdf_path = Path(pdf_path)
     try:
         rel = pdf_path.resolve().relative_to(corpus_root.resolve())
@@ -72,7 +69,7 @@ def parse_meta_from_path(pdf_path: Path, corpus_root: Path) -> DocMeta:
         rel = Path(pdf_path.name)
     parts = list(rel.parts)
 
-    # Tipo: la carpeta que sigue a "normatividad"; si no existe, la carpeta padre.
+    # si no hay carpeta despues de "normatividad", el tipo es la carpeta padre
     doc_type = ""
     if "normatividad" in parts:
         idx = parts.index("normatividad")
@@ -81,14 +78,12 @@ def parse_meta_from_path(pdf_path: Path, corpus_root: Path) -> DocMeta:
     if not doc_type and len(parts) >= 2:
         doc_type = parts[-2]
 
-    # Año: la primera parte de 4 digitos en la ruta.
     year = ""
     for part in parts:
         if re.fullmatch(r"(19|20)\d{2}", part):
             year = part
             break
 
-    # Numero: lo que precede al primer "_" en el nombre, si es numerico.
     stem = pdf_path.stem
     number = ""
     m = re.match(r"(\d+)[_\-]", stem)
@@ -215,14 +210,9 @@ def _is_table_line(line: str) -> bool:
 
 
 def _separar_cierre(lines: list[str]) -> list[str]:
-    """Pone "## CIERRE" donde empiezan las firmas, despues del ultimo articulo.
-
-    Sin esto, "PUBLIQUESE... Dada en Villavicencio... JOSE ... Secretario" queda dentro
-    de la respuesta del ultimo articulo. No se borra nada: el texto sigue en el .md,
-    pero bajo otra seccion, y qa_builder no lo usa como articulo. Solo se mira despues
-    del ULTIMO articulo (hay anexos con articulos propios despues de las firmas), y no
-    se corta si el articulo quedaria casi vacio (uno que empiece "Comuniquese la...").
-    """
+    """Pone "## CIERRE" donde empiezan las firmas, para que no queden dentro del ultimo articulo.
+    Solo mira despues del ultimo articulo (hay anexos despues de las firmas) y no corta si
+    el articulo quedaria casi vacio (uno que empiece "Comuniquese la...")."""
     arts = [i for i, l in enumerate(lines) if l.startswith("### ")]
     if not arts:
         return lines
@@ -240,13 +230,8 @@ def _separar_cierre(lines: list[str]) -> list[str]:
 
 
 def _normalize_markdown(md: str) -> str:
-    """Normaliza el Markdown de pymupdf4llm a estructura legal limpia.
-
-    - Preserva bloques de tabla tal cual.
-    - Descarta encabezados-ruido, banners de pagina, fechas sueltas y reglas.
-    - Deduplica lineas de texto corrido repetidas (subtitulos que se repiten por hoja).
-    - Re-promueve CONSIDERANDO/RESUELVE→##, ARTICULO→###, PARAGRAFO→####.
-    """
+    """Quita el ruido de pagina, deja una vez las lineas repetidas y vuelve encabezados
+    las secciones (##), articulos (###) y paragrafos (####). Las tablas quedan igual."""
     raw_lines = [_CJK_RE.sub("", l) for l in md.splitlines()]
 
     # Frecuencia de lineas de texto (sin decoracion) para deduplicar repetidos.
@@ -341,11 +326,8 @@ _IMPRESO_RE = re.compile(
 
 
 def _numero_impreso(text: str) -> tuple[str, str]:
-    """(numero, año) impresos en el encabezado, o ("", "") si no se encuentran.
-
-    Se lee del texto crudo, antes de la limpieza que borra el encabezado. Sirve para
-    detectar PDFs con el nombre equivocado (el archivo 49_2015.pdf es la RS 050 de 2015).
-    """
+    """(numero, año) del encabezado impreso, leido antes de la limpieza que lo borra.
+    Detecta PDF mal nombrados: el archivo 49_2015.pdf es la RS 050 de 2015."""
     for linea in text.splitlines()[:40]:
         s = _strip_decoration(linea).upper().replace(" ", "")
         m = _IMPRESO_RE.match(s)
@@ -377,11 +359,7 @@ def _yaml_frontmatter(meta: DocMeta, method: str, pages: int, char_count: int,
 
 
 def to_markdown(text: str, meta: DocMeta, method: str, pages: int) -> str:
-    """Construye el documento Markdown completo: frontmatter + titulo + cuerpo.
-
-    ``text`` es el Markdown crudo de pymupdf4llm (o texto plano de un fallback);
-    se normaliza a estructura legal limpia antes de escribirlo.
-    """
+    """Frontmatter + titulo + cuerpo normalizado, a partir del texto crudo extraido."""
     body = _normalize_markdown(text)
     frontmatter = _yaml_frontmatter(meta, method, pages, len(text), _numero_impreso(text))
     return f"{frontmatter}\n# {meta.titulo}\n\n{body}\n"
