@@ -1,27 +1,12 @@
-"""Evalua un checkpoint sobre el conjunto de prueba (data/dataset/test.json).
+"""Evalua un checkpoint con una muestra fija del test y el examen fuera de dominio.
 
-El script hace dos cosas SEPARADAS:
-
-  1. GENERAR (lo caro, ~45 min): le pasa cada pregunta al modelo y guarda las
-     respuestas en data/eval/<nombre-del-checkpoint>.json. De paso calcula, con
-     el modelo ya cargado, la perdida y la entropia de cada ejemplo.
-  2. MEDIR (segundos): lee ese archivo y calcula las metricas.
-
-Si el archivo de respuestas ya existe se reutiliza, asi que corregir o agregar
-una metrica cuesta segundos en vez de volver a generar. Con --regenerar se
-fuerza a generar de nuevo.
-
-Metricas:
-  - Exactitud de citas y tasa de alucinacion: son las que deciden el ganador.
-  - BERTScore-F1, coseno semantico, F1 por tokens: parecido con la referencia.
-  - ROUGE-L, BLEU, CIDEr: solapamiento de texto (comparan corridas entre si).
-  - Perdida, perplejidad, entropia, informacion mutua: intrinsecas.
-
-Al final imprime una linea con las columnas separadas por tabulacion, lista
-para pegar en el Excel de la bitacora.
+Generar las respuestas tarda ~45 min y se guardan en data/eval/<checkpoint>.json;
+medir tarda segundos, asi que si ese archivo existe se reutiliza.
+La exactitud de citas y la tasa de alucinacion deciden el ganador; las demas son de apoyo.
+Al final imprime la linea para pegar en el Excel.
 
 Uso:
-    python scripts/evaluate.py --checkpoint data/checkpoints/t1_7b-e3-lr2e4-r16-wd0.0
+    python scripts/evaluate.py --checkpoint data/checkpoints/v3t1_7b-e4-lr2e4-r16-wd0.01-do0.05-wu0.1
     python scripts/evaluate.py --checkpoint <carpeta> --regenerar
     python scripts/evaluate.py --checkpoint <carpeta> --limit 10   # solo para probar el script
 """
@@ -99,14 +84,8 @@ def parse_args():
 
 # Generar las respuestas (necesita el modelo).
 def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device, system_prompt):
-    """Un forward pass sobre (pregunta + respuesta de referencia), en el MISMO
-    formato con el que entrena train_gpu.py (system prompt + user/assistant).
-
-    Devuelve (perdida, entropia) sobre los tokens de la respuesta. La perplejidad
-    se calcula despues como exp(media de las perdidas), que es mas estable. Se
-    trunca a SEQ_LEN para no medir fuera de la distribucion de entrenamiento ni
-    reventar la VRAM con respuestas largas.
-    """
+    """Perdida y entropia de la respuesta de referencia, en el mismo formato de train_gpu.py.
+    Se corta a SEQ_LEN como en el entrenamiento, asi tampoco se llena la VRAM."""
     import torch
 
     base = [{"role": "system", "content": system_prompt},
@@ -138,8 +117,6 @@ def perdida_entropia(hf_model, tokenizer, pregunta, respuesta, device, system_pr
 
 
 def guardar(ruta, datos):
-    """Escribe el archivo de respuestas. Se llama dos veces: apenas terminan las
-    generaciones y otra vez con la perdida ya calculada."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
     with open(ruta, "w", encoding="utf-8") as f:
         json.dump(datos, f, ensure_ascii=False, indent=2)
@@ -155,7 +132,6 @@ def muestra_por_familia(test):
 
 
 def generar(ruta_salida, checkpoint, config, test, fuera, limite):
-    """Genera las respuestas del modelo y las guarda en un JSON."""
     modelo = create_model(config, checkpoint=checkpoint)
     if modelo is None or not modelo.is_available():
         print("No hay checkpoint. Pasalo con --checkpoint o ponlo en config.yaml.")
@@ -228,15 +204,7 @@ NOMBRE_RE = re.compile(
 
 
 def hiperparametros(carpeta):
-    """Recupera los hiperparametros con los que se entreno este adaptador.
-
-    Se busca en tres sitios, en este orden:
-      1. hiperparametros.json  -> lo escribe train_gpu.py, es el registro completo
-      2. adapter_config.json   -> lo escribe PEFT, manda en rank/alpha/dropout
-      3. el nombre de la carpeta -> ultimo recurso para checkpoints viejos
-    Lo que no se encuentre queda en None y se avisa por pantalla, para no pegar
-    una fila con columnas vacias sin darse cuenta.
-    """
+    """Busca en hiperparametros.json, en adapter_config.json y por ultimo en el nombre de la carpeta."""
     carpeta = Path(carpeta)
     datos = {}
 
@@ -254,7 +222,6 @@ def hiperparametros(carpeta):
         datos["lora_alpha"] = peft.get("lora_alpha", datos.get("lora_alpha"))
         datos["lora_dropout"] = peft.get("lora_dropout", datos.get("lora_dropout"))
 
-    # Ultimo recurso: deducirlos del nombre.
     m = NOMBRE_RE.match(carpeta.name)
     if m:
         del_nombre = {
@@ -277,11 +244,7 @@ def hiperparametros(carpeta):
 
 # Metricas (solo texto, sin el modelo).
 def citas(texto):
-    """Conjunto de citas (numero, anio) que aparecen en un texto.
-
-    Se quitan los ceros de la izquierda para que "007 de 1990" y "7 de 1990"
-    cuenten como la misma cita.
-    """
+    """Citas (numero, anio) de un texto, sin ceros a la izquierda: "007 de 1990" = "7 de 1990"."""
     encontradas = CITA_RE.findall(texto) + CITA_SIN_NO_RE.findall(texto)
     return {(n.lstrip("0") or "0", a) for n, a in encontradas}
 
@@ -305,14 +268,8 @@ def reconoce_no_saber(texto):
 
 
 def tasa_alucinacion(casos_fuera):
-    """Sobre preguntas de cosas que NO estan en el corpus: que fraccion contesta
-    como si supiera, en vez de reconocer que no tiene la informacion.
-
-    Las de conocimiento general NO cuentan aqui. Son preguntas de control cuya
-    respuesta correcta SI existe ("Paris es la capital de Francia"): contestarlas
-    bien es lo que se espera, no una alucinacion. Antes entraban al denominador
-    y empujaban la tasa hacia arriba sin motivo.
-    """
+    """Fraccion de preguntas fuera de dominio que contesta como si supiera.
+    Las de control (conocimiento general) no cuentan: contestarlas bien es lo esperado."""
     evaluables = [c for c in casos_fuera if c.get("bloque") != BLOQUE_CONTROL]
     if not evaluables:
         return 0.0
@@ -321,11 +278,7 @@ def tasa_alucinacion(casos_fuera):
 
 
 def alucinacion_por_bloque(casos_fuera):
-    """La misma tasa, separada por tipo de pregunta.
-
-    Sirve para ver DONDE falla: no es lo mismo inventarse una norma de Unillanos
-    que no existe que confundirse con otra universidad.
-    """
+    """La misma tasa por tipo de pregunta, para ver donde falla."""
     por_bloque = {}
     for c in casos_fuera:
         bloque = c.get("bloque", "sin_bloque")
@@ -338,8 +291,6 @@ def alucinacion_por_bloque(casos_fuera):
 
 
 def tasa_abstencion(casos_fuera):
-    """El complemento de la tasa de alucinacion: cuantas veces reconoce que no
-    sabe. Es una de las dos accuracies reales del proyecto."""
     return round(1 - tasa_alucinacion(casos_fuera), 4)
 
 
@@ -361,12 +312,7 @@ def por_familia(casos):
 
 
 def repeticion_ngramas(texto, n=4):
-    """Que fraccion de los grupos de n palabras seguidas esta repetida.
-
-    Caza el texto degenerado, que es cuando el modelo entra en bucle y repite
-    la misma frase una y otra vez. Ninguna de las otras metricas lo detecta de
-    frente: la entropia baja apenas lo insinua. 0 = nada repetido.
-    """
+    """Fraccion de grupos de n palabras repetidos: detecta cuando el modelo entra en bucle."""
     tokens = texto.lower().split()
     grupos = ngramas(tokens, n)
     if not grupos:
@@ -375,12 +321,7 @@ def repeticion_ngramas(texto, n=4):
 
 
 def razon_longitud(respuesta, referencia):
-    """Largo de la respuesta dividido por el largo de la referencia.
-
-    1.0 es lo ideal. Muy por debajo = se corto o no contesto; muy por encima =
-    se fue por las ramas o entro en bucle. Se reporta la MEDIANA porque unos
-    pocos casos extremos arrastrarian el promedio.
-    """
+    """Palabras de la respuesta sobre palabras de la referencia; 1.0 es lo ideal."""
     if not referencia.strip():
         return 0.0
     return len(respuesta.split()) / len(referencia.split())
@@ -414,13 +355,8 @@ def ngramas(tokens, n):
 
 
 def cider(preds, refs, n_max=4):
-    """CIDEr simplificado: coseno de vectores de n-gramas ponderados por TF-IDF,
-    promediado para n=1..4. El IDF sale del corpus de referencias.
-
-    Con una sola referencia por pregunta pierde su gracia original (medir el
-    consenso entre varias referencias) y queda como un coseno TF-IDF de
-    n-gramas. Se reporta porque la asesora la pidio, descrita asi de honesta.
-    """
+    """CIDEr simplificado: coseno TF-IDF de n-gramas, n=1..4.
+    Con una sola referencia no mide consenso; se reporta porque la asesora la pidio."""
     refs_tok = [r.lower().split() for r in refs]
     preds_tok = [p.lower().split() for p in preds]
     total = len(refs_tok)
@@ -455,13 +391,8 @@ def cider(preds, refs, n_max=4):
 
 
 def info_mutua(pred, ref):
-    """Informacion mutua entre "de que texto viene" (respuesta/referencia) y
-    "que palabra es". Es una DIVERGENCIA de vocabulario: 0 cuando los dos textos
-    usan las palabras igual y sube cuando difieren.
-
-    Es informativa: mide informatividad, NO si la respuesta es correcta ni si
-    esta bien escrita. Nunca se usa sola para decidir.
-    """
+    """Informacion mutua del vocabulario: 0 si respuesta y referencia usan las palabras igual.
+    No dice si la respuesta es correcta; nunca se usa sola."""
     tp, tr = pred.lower().split(), ref.lower().split()
     if not tp or not tr:
         return 0.0
@@ -487,12 +418,7 @@ def coseno_semantico(preds, refs):
 
 
 def calcular_metricas(datos, hp):
-    """Calcula todas las metricas a partir del archivo de respuestas.
-
-    `hp` son los hiperparametros de la corrida: van en las primeras columnas de
-    la fila para poder ordenar y graficar el Excel por ellos (con el nombre del
-    checkpoint solo no se puede).
-    """
+    """Los hiperparametros van en las primeras columnas para ordenar y graficar el Excel."""
     casos = datos["casos"]
     preds = [c["respuesta"] for c in casos]
     refs = [c["referencia"] for c in casos]
@@ -545,7 +471,7 @@ def calcular_metricas(datos, hp):
         "perplejidad": round(math.exp(perdida), 2),
         "entropia": round(entropia, 4),
         "info_mutua": round(sum(info_mutua(p, r) for p, r in zip(preds, refs)) / n, 4),
-        # texto degenerado
+        # texto degenerado; mediana porque unos pocos casos extremos arrastran el promedio
         "repeticion_4g": round(mediana(repeticiones), 4),
         "repeticion_altas": sum(1 for x in repeticiones if x > 0.30),
         "razon_longitud": round(mediana(razones), 4),
