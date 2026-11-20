@@ -50,13 +50,9 @@ def _guardar_crudo(raw_file: Path, doc, method: str):
 
 
 def _extraer_pdf(pdf_path: Path, usar_ocr: bool):
-    """Etapa 1: lee el PDF. Devuelve (doc, metodo, motivo).
-
-    Si el PDF necesita OCR y no se pidio --ocr, doc es None y motivo dice por que
-    (escaneado, corrupto o vacio) para mandarlo a la cola.
-    """
+    """Etapa 1: devuelve (doc, metodo, motivo). Si necesita OCR y no se pidio --ocr,
+    doc es None y motivo dice por que va a la cola (escaneado, corrupto o vacio)."""
     if not is_likely_digital(pdf_path):
-        # Sin --ocr, los escaneados solo se anotan en la cola para la workstation.
         if not usar_ocr:
             print("    escaneado -> a cola de OCR (usar --ocr para procesarlo)")
             return None, None, "escaneado_omitido"
@@ -64,25 +60,21 @@ def _extraer_pdf(pdf_path: Path, usar_ocr: bool):
         doc = extract_scanned(pdf_path)
         return doc, doc.method, None
 
-    # Digital: texto seleccionable, se extrae con pymupdf4llm.
     doc = extract_digital(pdf_path)
 
-    # Fuente rota (letras cambiadas por digitos): ningun extractor de texto
-    # lo arregla -> se manda a OCR con docling.
+    # fuente rota (letras cambiadas por digitos): ningun extractor de texto la arregla, solo el OCR
     if doc.corrupt:
         if not usar_ocr:
             print("    fuente corrupta -> a cola de OCR (no se genera .md ruidoso)")
             return None, None, "corrupto_omitido"
         print("    fuente corrupta -> OCR...")
         doc = extract_scanned(pdf_path)
-    # Era 'digital' pero salio vacio: intentar OCR si esta habilitado.
     elif doc.is_empty() and usar_ocr:
         print("    texto vacío -> intentando OCR...")
         doc = extract_scanned(pdf_path)
 
     if doc.is_empty():
-        # Clasificado como digital pero sin texto real extraible (capa de texto
-        # vacia). No es un error: se desvia a OCR como los escaneados.
+        # pdf digital con la capa de texto vacia: no es un error, va a OCR como un escaneado
         print("    sin texto extraíble -> a cola de OCR")
         return None, None, "vacio_a_ocr"
 
@@ -168,16 +160,14 @@ def main():
         if args.limit is not None and procesados >= args.limit:
             break
 
-        # Rutas espejando la estructura: <año>/<TIPO>/<archivo>
+        # <año>/<TIPO>/<archivo>, sin el "si/normatividad" intermedio
         rel_parent = pdf_path.parent.relative_to(pdf_dir)
-        # Aplanar el "si/normatividad" intermedio para que la ruta sea legible
         clean_parts = [p for p in rel_parent.parts if p not in ("si", "normatividad")]
         raw_file = raw_dir.joinpath(*clean_parts) / (pdf_path.stem + ".json")
         out_subdir = output_dir.joinpath(*clean_parts)
         output_file = out_subdir / (pdf_path.stem + ".md")
 
         try:
-            # El crudo se extrae una sola vez; el .md se rehace siempre.
             if raw_file.exists():
                 datos = json.loads(raw_file.read_text(encoding="utf-8"))
                 text, method, pages = datos["texto"], datos["metodo"], datos["paginas"]
